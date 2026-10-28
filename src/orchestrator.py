@@ -14,6 +14,7 @@ from src.layers.l08_context import ContextLayer
 from src.layers.l11_league_shift import LeagueShiftLayer
 from src.layers.l24_standings_pressure import StandingsPressureLayer
 from src.layers.l12_geography import GeographyLayer
+from src.layers.l16_lifecycle import LifecycleLayer
 from src.scoring import BayesianScorer
 
 log = logging.getLogger("orchestrator")
@@ -129,6 +130,7 @@ class MatchPipeline:
             DefenseLayer(bzzoiro),
             MomentumLayer(bzzoiro),
             LineupsLayer(),
+            LifecycleLayer(bzzoiro),
             RefereeLayer(),
             ContextLayer(),
             StandingsPressureLayer(),
