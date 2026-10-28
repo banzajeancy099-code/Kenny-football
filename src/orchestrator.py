@@ -8,6 +8,12 @@ from src.layers.l03_h2h import H2HLayer
 from src.layers.l04_defense import DefenseLayer
 from src.layers.l06_momentum import MomentumLayer
 from src.layers.l09_fatigue import FatigueLayer
+from src.layers.l05_lineups import LineupsLayer
+from src.layers.l07_referee import RefereeLayer
+from src.layers.l08_context import ContextLayer
+from src.layers.l11_league_shift import LeagueShiftLayer
+from src.layers.l24_standings_pressure import StandingsPressureLayer
+from src.layers.l12_geography import GeographyLayer
 from src.scoring import BayesianScorer
 
 log = logging.getLogger("orchestrator")
@@ -122,6 +128,12 @@ class MatchPipeline:
             H2HLayer(api_football),
             DefenseLayer(bzzoiro),
             MomentumLayer(bzzoiro),
+            LineupsLayer(),
+            RefereeLayer(),
+            ContextLayer(),
+            StandingsPressureLayer(),
+            LeagueShiftLayer(),
+            GeographyLayer(),
             FatigueLayer(bzzoiro),
         ]
         self.scorer = BayesianScorer(weights)
@@ -239,7 +251,7 @@ class MatchPipeline:
             "proba_over": round(proba_over, 3),
             "edge": round(edge, 3),
             "mise_kelly": mise,
-            "layers": {r.layer_id: round(r.score, 2) for r in results},
+            "layers": {str(r.layer_id): round(r.score, 2) for r in results},
             "warnings": warnings,
             "result": None,
         }
