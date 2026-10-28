@@ -225,13 +225,14 @@ class MatchPipeline:
 
         mise = 0.0
         if edge > 0.05 and ensemble.score >= 5.5:
-            mise = round(1000 * edge * 0.15, 2)
+            mise = round(1000 * edge * 0.05, 2)
 
         retenu = (
             ensemble.score >= 5.5
             and proba_over >= 0.55
             and ensemble.confidence >= 0.7
             and ensemble.std < 1.5
+            and 0.10 <= edge <= 0.20   # ← filtre optimal backtest
         )
 
         league_id = match.get("league_id") or (match.get("league") or {}).get("id")
@@ -261,8 +262,8 @@ class MatchPipeline:
                 cote_under = 1.0 / (1.0 - (1.0 / cote_over))
                 if cote_under > 1.01:
                     edge_under = proba_under * cote_under - 1
-                    if edge_under > 0.02 and ensemble.score <= 5.0:
-                        mise_under = round(1000 * edge_under * 0.15, 2)
+                    if 0.10 <= edge_under <= 0.20 and ensemble.score <= 5.0:
+                        mise_under = round(1000 * edge_under * 0.05, 2)
             except Exception:
                 pass
 

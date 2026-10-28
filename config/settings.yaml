@@ -51,7 +51,7 @@ thresholds:
   std_max: 1.5
 
 kelly:
-  fraction: 0.15
+  fraction: 0.05
   edge_min: 0.05
   bankroll: 1000
 
