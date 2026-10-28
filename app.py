@@ -1,12 +1,12 @@
-# app.py — Kenny Football v1.3.0
-# Flask + APScheduler (00h + 30min + 04h verif) + async jobs + pré-filtre + JSON
+# app.py — Kenny Football v1.3.1
+# Flask + APScheduler + async jobs + pré-filtre + JSON + archive dynamique
 import os
 import sys
 import json
 import uuid
 import logging
 import threading
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -19,6 +19,7 @@ from src.clients.bzzoiro import BzzoiroClient
 from src.clients.api_football import APIFootballClient
 from src.orchestrator import MatchPipeline, prefilter
 
+# ========== LOGGER ==========
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -26,6 +27,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("kenny-football")
 
+# ========== FLASK ==========
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.jinja_env.auto_reload = True
@@ -41,6 +43,7 @@ def add_no_cache_headers(response):
     return response
 
 
+# ========== CONFIG ==========
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -70,6 +73,7 @@ def _build_league_over_rates(settings):
 LEAGUE_OVER_RATES = _build_league_over_rates(SETTINGS)
 log.info(f"📊 league_over_rates: {LEAGUE_OVER_RATES}")
 
+# ========== CLIENTS ==========
 BZZOIRO_KEY = os.environ.get("BZZOIRO_API_KEY")
 if not BZZOIRO_KEY:
     log.error("❌ BZZOIRO_API_KEY manquante")
@@ -81,7 +85,7 @@ if os.environ.get("API_FOOTBALL_KEY"):
     api_football = APIFootballClient(api_key=os.environ["API_FOOTBALL_KEY"])
     log.info("✅ API-Football activé")
 else:
-    log.warning("⚠️  API-Football désactivé (pas de clé)")
+    log.warning("⚠️  API-Football désactivé")
 
 pipeline = MatchPipeline(
     bzzoiro=bzzoiro,
@@ -91,6 +95,7 @@ pipeline = MatchPipeline(
 )
 
 
+# ========== STOCKAGE JSON ==========
 def _pred_file(d=None):
     d = d or date.today()
     return DATA_DIR / f"predictions_{d.isoformat()}.json"
@@ -116,6 +121,7 @@ def save_predictions(data, d=None):
     tmp.replace(f)
 
 
+# ========== JOB QUEUE ==========
 ANALYSIS_JOBS = {}
 JOBS_LOCK = threading.Lock()
 
@@ -137,7 +143,7 @@ def _run_analysis_job(job_id, matches):
                 result = pipeline.run(m)
                 mid = str(result.get("match_id") or m.get("id"))
                 data["matches"][mid] = result
-                if result.get("retenu"):
+                if result.get("retenu") or (result.get("mise_kelly") or 0) > 0 or (result.get("mise_under") or 0) > 0:
                     with JOBS_LOCK:
                         ANALYSIS_JOBS[job_id]["retenus"] += 1
             except Exception as e:
@@ -161,6 +167,7 @@ def _run_analysis_job(job_id, matches):
         log.error(f"❌ [JOB {job_id}] {e}", exc_info=True)
 
 
+# ========== JOBS CRON ==========
 def job_analyse_quotidienne():
     log.info("🕛 [CRON] Analyse initiale quotidienne")
     try:
@@ -201,10 +208,10 @@ def job_refresh_cotes():
                     edge = proba * new_cote - 1
                     pred["edge"] = round(edge, 3)
                     mise = 0
-                    if edge > SETTINGS["kelly"]["edge_min"] and pred.get("score", 0) >= SETTINGS["thresholds"]["score_min"]:
-                        mise = SETTINGS["kelly"]["bankroll"] * edge * SETTINGS["kelly"]["fraction"]
-                    pred["mise_kelly"] = round(mise, 2)
-                    if pred.get("score", 0) < SETTINGS["thresholds"]["score_min"]:
+                    if edge >= 0.10 and pred.get("score", 0) >= 5.2:
+                        mise = min(round(1000 * edge * 0.05, 2), 30.0)
+                    pred["mise_kelly"] = mise
+                    if pred.get("score", 0) < 5.2:
                         pred["retenu"] = False
                     changed += 1
             except Exception as e:
@@ -247,16 +254,18 @@ def _verifier_match(pred, event_id):
         return None
 
 
-def job_verifier_resultats(d=None):
-    target = d or (date.today() - timedelta(days=1))
-    log.info(f"🔍 [VERIF] {target.isoformat()}")
+def _verifier_jour(target):
     try:
         data = load_predictions(target)
-        matches = data.get("matches", {})
-        if not matches:
+        matches_dict = data.get("matches") or {}
+        if not isinstance(matches_dict, dict):
+            return
+        if not matches_dict:
             return
         verified = correct = wrong = pending = 0
-        for mid, pred in matches.items():
+        for mid, pred in matches_dict.items():
+            if not isinstance(pred, dict):
+                continue
             if pred.get("result"):
                 verified += 1
                 if pred["result"].get("verdict") == "✓":
@@ -286,9 +295,17 @@ def job_verifier_resultats(d=None):
             "verified_at": datetime.now().isoformat(),
         }
         save_predictions(data, target)
-        log.info(f"✅ [VERIF] {verified} · {correct}✓ / {wrong}× · {pending} en attente")
+        log.info(f"✅ [VERIF {target}] {verified} · {correct}✓ / {wrong}× · {pending} attente")
     except Exception as e:
-        log.error(f"❌ [VERIF] {e}", exc_info=True)
+        log.error(f"❌ [VERIF {target}] {e}", exc_info=True)
+
+
+def job_verifier_resultats(d=None):
+    if d is None:
+        for delta in (0, 1):
+            _verifier_jour(date.today() - timedelta(days=delta))
+        return
+    _verifier_jour(d)
 
 
 def _extract_over_odd(odds_json):
@@ -314,20 +331,22 @@ def _extract_over_odd(odds_json):
         return None
 
 
+# ========== SCHEDULER ==========
 scheduler = BackgroundScheduler(timezone="Europe/Zurich")
 scheduler.add_job(job_analyse_quotidienne, CronTrigger(hour=0, minute=0),
                   id="analyse_quotidienne", replace_existing=True, misfire_grace_time=3600)
 scheduler.add_job(job_refresh_cotes, IntervalTrigger(minutes=30),
                   id="refresh_cotes", replace_existing=True, misfire_grace_time=600)
-scheduler.add_job(job_verifier_resultats, CronTrigger(hour=4, minute=0),
-                  id="verification_resultats", replace_existing=True, misfire_grace_time=3600)
+scheduler.add_job(job_verifier_resultats, IntervalTrigger(hours=1),
+                  id="verification_resultats", replace_existing=True, misfire_grace_time=1800)
 
 if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
     scheduler.start()
     atexit.register(lambda: scheduler.shutdown())
-    log.info("⏰ Scheduler démarré (00h + 30min + 04h verif)")
+    log.info("⏰ Scheduler démarré (00h analyse + 30min refresh + 1h vérif)")
 
 
+# ========== ROUTES ==========
 @app.route("/")
 def index():
     return render_template("dashboard.html")
@@ -336,7 +355,7 @@ def index():
 @app.route("/api/health")
 def health():
     return jsonify({
-        "status": "ok", "version": "1.3.0", "layers": 6,
+        "status": "ok", "version": "1.3.1", "layers": 13,
         "api_football": "enabled" if api_football else "disabled",
         "scheduler": "running" if scheduler.running else "stopped",
         "jobs": [j.id for j in scheduler.get_jobs()] if scheduler.running else [],
@@ -353,11 +372,6 @@ def prefilter_preview():
         return jsonify({
             "success": True, "date": today,
             "total_bzzoiro": len(all_m), "after_prefilter": len(filtered),
-            "sample": [
-                {"id": m.get("id"), "home": m.get("home_team"),
-                 "away": m.get("away_team"), "league_id": m.get("league_id")}
-                for m in filtered[:10]
-            ],
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -380,10 +394,8 @@ def analyze_start():
         return jsonify({
             "success": True, "job_id": job_id,
             "total_bzzoiro": len(all_m), "filtered": len(filtered),
-            "message": f"Analyse de {len(filtered)} matchs démarrée",
         })
     except Exception as e:
-        log.error(f"Erreur /api/analyze/start: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -419,12 +431,81 @@ def analyze_sync():
 
 @app.route("/api/predictions")
 def predictions_today():
-    data = load_predictions()
-    matches = list(data.get("matches", {}).values())
-    return jsonify({"date": data.get("date"), "last_update": data.get("last_update"),
-                    "total": len(matches),
-                    "retenus": sum(1 for m in matches if m.get("retenu")),
-                    "matches": matches})
+    """Renvoie les prédictions ACTIVES (matchs pas encore terminés)."""
+    today = date.today()
+    data = load_predictions(today)
+    matches_dict = data.get("matches") or {}
+    if not isinstance(matches_dict, dict):
+        matches_dict = {}
+    matches = list(matches_dict.values())
+
+    now = datetime.now(timezone.utc)
+    active = []
+    for m in matches:
+        if not isinstance(m, dict):
+            continue
+        if m.get("result"):
+            continue
+        ko = m.get("kickoff")
+        if ko:
+            try:
+                ko_dt = datetime.fromisoformat(ko.replace("Z", "+00:00"))
+                if (now - ko_dt).total_seconds() > 2.5 * 3600:
+                    continue
+            except Exception:
+                pass
+        active.append(m)
+
+    retenus_count = sum(
+        1 for m in active
+        if m.get("retenu") or (m.get("mise_kelly") or 0) > 0 or (m.get("mise_under") or 0) > 0
+    )
+    return jsonify({
+        "date": today.isoformat(),
+        "is_today": True,
+        "last_update": data.get("last_update"),
+        "total": len(active),
+        "retenus": retenus_count,
+        "matches": active,
+    })
+
+
+@app.route("/api/predictions/filtered")
+def predictions_filtered():
+    kind = request.args.get("kind", "all")
+    today = date.today()
+    data = load_predictions(today)
+    matches_dict = data.get("matches") or {}
+    if not isinstance(matches_dict, dict):
+        matches_dict = {}
+    matches = list(matches_dict.values())
+
+    now = datetime.now(timezone.utc)
+    active = []
+    for m in matches:
+        if not isinstance(m, dict):
+            continue
+        if m.get("result"):
+            continue
+        ko = m.get("kickoff")
+        if ko:
+            try:
+                ko_dt = datetime.fromisoformat(ko.replace("Z", "+00:00"))
+                if (now - ko_dt).total_seconds() > 2.5 * 3600:
+                    continue
+            except Exception:
+                pass
+        active.append(m)
+
+    if kind == "over":
+        active = [m for m in active if not m.get("is_under_bet")]
+    elif kind == "under":
+        active = [m for m in active if m.get("is_under_bet")]
+
+    return jsonify({
+        "date": today.isoformat(), "kind": kind,
+        "total": len(active), "matches": active,
+    })
 
 
 @app.route("/api/predictions/<date_str>")
@@ -432,35 +513,54 @@ def predictions_by_date(date_str):
     try:
         d = date.fromisoformat(date_str)
         data = load_predictions(d)
-        matches = list(data.get("matches", {}).values())
+        matches_dict = data.get("matches") or {}
+        if not isinstance(matches_dict, dict):
+            matches_dict = {}
+        matches = list(matches_dict.values())
         return jsonify({"date": data.get("date"), "last_update": data.get("last_update"),
                         "total": len(matches),
-                        "retenus": sum(1 for m in matches if m.get("retenu")),
+                        "retenus": sum(1 for m in matches if isinstance(m, dict) and (
+                            m.get("retenu") or (m.get("mise_kelly") or 0) > 0 or (m.get("mise_under") or 0) > 0)),
                         "matches": matches})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
 
 
-@app.route("/api/history")
-def history():
-    files = sorted(DATA_DIR.glob("predictions_*.json"), reverse=True)[:30]
+@app.route("/api/archive")
+def archive():
+    """Liste des jours avec AU MOINS UN match terminé."""
+    files = sorted(DATA_DIR.glob("predictions_*.json"), reverse=True)
     out = []
     for f in files:
         try:
             d_str = f.stem.replace("predictions_", "")
-            data = load_predictions(date.fromisoformat(d_str))
-            matches = list(data.get("matches", {}).values())
-            correct = sum(1 for m in matches if m.get("result", {}).get("verdict") == "✓")
-            wrong = sum(1 for m in matches if m.get("result", {}).get("verdict") == "×")
+            d_obj = date.fromisoformat(d_str)
+            data = load_predictions(d_obj)
+            matches_dict = data.get("matches") or {}
+            if not isinstance(matches_dict, dict):
+                continue
+            matches = list(matches_dict.values())
+            finished = [m for m in matches if isinstance(m, dict) and m.get("result")]
+            if not finished:
+                continue
+            over = [m for m in finished if not m.get("is_under_bet")]
+            under = [m for m in finished if m.get("is_under_bet")]
+            correct = sum(1 for m in finished if m.get("result", {}).get("verdict") == "✓")
+            wrong = sum(1 for m in finished if m.get("result", {}).get("verdict") == "×")
             out.append({
-                "date": d_str, "last_update": data.get("last_update"),
-                "total": len(matches),
-                "retenus": sum(1 for m in matches if m.get("retenu")),
-                "verified": correct + wrong, "correct": correct, "wrong": wrong,
+                "date": d_str,
+                "last_update": data.get("last_update"),
+                "total": len(finished),
+                "over_count": len(over),
+                "under_count": len(under),
+                "verified": correct + wrong,
+                "correct": correct,
+                "wrong": wrong,
+                "accuracy": round(correct / (correct + wrong), 3) if (correct + wrong) else None,
             })
         except Exception:
             pass
-    return jsonify({"history": out})
+    return jsonify({"archive": out, "total_days": len(out)})
 
 
 @app.route("/api/stats")
@@ -472,9 +572,12 @@ def stats_globales():
         try:
             d_str = f.stem.replace("predictions_", "")
             data = load_predictions(date.fromisoformat(d_str))
-            matches = data.get("matches", {})
-            correct = sum(1 for m in matches.values() if m.get("result", {}).get("verdict") == "✓")
-            wrong = sum(1 for m in matches.values() if m.get("result", {}).get("verdict") == "×")
+            matches_dict = data.get("matches") or {}
+            if not isinstance(matches_dict, dict):
+                continue
+            matches = matches_dict
+            correct = sum(1 for m in matches.values() if isinstance(m, dict) and m.get("result", {}).get("verdict") == "✓")
+            wrong = sum(1 for m in matches.values() if isinstance(m, dict) and m.get("result", {}).get("verdict") == "×")
             verified = correct + wrong
             if verified > 0 or len(matches) > 0:
                 by_day.append({
@@ -501,13 +604,7 @@ def verifier_resultats(date_str):
         job_verifier_resultats(d)
         data = load_predictions(d)
         return jsonify({"success": True, "date": date_str,
-                        "summary": data.get("verification_summary", {}),
-                        "matches": [
-                            {"match_id": mid, "home": p.get("home"), "away": p.get("away"),
-                             "score": p.get("score"), "proba_over": p.get("proba_over"),
-                             "retenu": p.get("retenu"), "result": p.get("result")}
-                            for mid, p in data.get("matches", {}).items()
-                        ]})
+                        "summary": data.get("verification_summary", {})})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
 
@@ -521,7 +618,10 @@ def cron_status():
                          "next_run": j.next_run_time.isoformat() if j.next_run_time else None,
                          "trigger": str(j.trigger)})
     today_data = load_predictions()
-    matches = list(today_data.get("matches", {}).values())
+    matches_dict = today_data.get("matches") or {}
+    if not isinstance(matches_dict, dict):
+        matches_dict = {}
+    matches = list(matches_dict.values())
     return jsonify({"scheduler_running": scheduler.running, "jobs": jobs,
                     "active_analysis_jobs": [
                         {"job_id": k, **v} for k, v in ANALYSIS_JOBS.items()
@@ -530,7 +630,8 @@ def cron_status():
                     "today": {"date": today_data.get("date"),
                               "last_update": today_data.get("last_update"),
                               "total_matches": len(matches),
-                              "retenus": sum(1 for m in matches if m.get("retenu"))}})
+                              "retenus": sum(1 for m in matches if isinstance(m, dict) and (
+                                  m.get("retenu") or (m.get("mise_kelly") or 0) > 0 or (m.get("mise_under") or 0) > 0))}})
 
 
 @app.route("/api/cron/trigger/<job_id>", methods=["POST", "GET"])
@@ -538,7 +639,7 @@ def cron_trigger(job_id):
     if job_id == "analyse":
         t = threading.Thread(target=job_analyse_quotidienne, daemon=True)
         t.start()
-        return jsonify({"success": True, "job": "analyse", "message": "Lancé en background"})
+        return jsonify({"success": True, "job": "analyse"})
     if job_id == "refresh":
         job_refresh_cotes()
         return jsonify({"success": True, "job": "refresh"})
@@ -551,7 +652,8 @@ def cron_trigger(job_id):
     return jsonify({"success": False, "error": "unknown job"}), 404
 
 
+# ========== MAIN ==========
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
-    log.info(f"🚀 Kenny Football v1.3 sur http://0.0.0.0:{port}")
+    log.info(f"🚀 Kenny Football v1.3.1 sur http://0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)
