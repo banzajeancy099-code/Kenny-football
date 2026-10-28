@@ -122,7 +122,12 @@
         const score = Number(m.score ?? 0).toFixed(2);
         const proba = ((m.proba_over ?? 0) * 100).toFixed(0);
         const edge = Number(m.edge ?? 0).toFixed(2);
-        const cote = m.cote_over ?? '—';
+        const coteRaw = m.cote_over ?? '—';
+        const cSrc = m.cote_source || '';
+        let coteBadge = '';
+        if (cSrc.startsWith('estimated')) coteBadge = '<span class="text-yellow-500 text-xs" title="Cote estimée (Bzzoiro pas encore publiée)">~</span>';
+        else if (cSrc.startsWith('default')) coteBadge = '<span class="text-red-400 text-xs" title="Aucune cote disponible">⚠️</span>';
+        const cote = `${coteRaw}${coteBadge}`;
         const mise = Number(m.mise_kelly ?? 0).toFixed(2);
         const league = m.league_name || (m.league_id ? `Ligue ${m.league_id}` : 'Ligue inconnue');
         return `
