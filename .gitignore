@@ -1,11 +1,11 @@
 .env
+.env.local
+*.bak
 data/
 logs/
-*.bak
-*.broken.bak
 __pycache__/
 *.pyc
 *.pyo
-.venv/
-venv/
 .DS_Store
+venv/
+env/

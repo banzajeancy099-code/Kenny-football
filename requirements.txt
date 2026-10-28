@@ -4,3 +4,4 @@ numpy>=1.26.0
 pyyaml>=6.0
 apscheduler>=3.10.0
 python-dateutil>=2.8.2
+atoma>=0.0.17
