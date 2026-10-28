@@ -99,6 +99,14 @@ for i, match in enumerate(all_finished, 1):
             "actual_goals": total,
             "correct": pred_over == actual_over,
             "retenu": pred.get("retenu", False),
+            "cote": pred.get("cote_over"),
+            "cote_source": pred.get("cote_source"),
+            "edge": pred.get("edge"),
+            "mise_kelly": pred.get("mise_kelly", 0),
+            "is_under_bet": pred.get("is_under_bet", False),
+            "proba_under": pred.get("proba_under"),
+            "edge_under": pred.get("edge_under"),
+            "mise_under": pred.get("mise_under", 0),
         })
         if i % 10 == 0:
             print(f"  {i}/{len(all_finished)}...")

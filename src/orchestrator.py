@@ -247,6 +247,25 @@ class MatchPipeline:
         elif cote_source.startswith("estimated"):
             warnings.append("cote estimée depuis BTTS (Bzzoiro pas encore publié)")
 
+        # Détection Under : si proba_over < 0.45, c'est un pari Under potentiel
+        is_under_bet = proba_over < 0.45
+        proba_under = 1.0 - proba_over
+        edge_under = None
+        mise_under = 0.0
+
+        if is_under_bet and (cote_source.startswith("api") or cote_source.startswith("estimated")):
+            # Cote Under = 1 / (1 - proba_marché)
+            # Mais on utilise la cote réelle du marché
+            # L'API peut donner Under directement, sinon approximation
+            try:
+                cote_under = 1.0 / (1.0 - (1.0 / cote_over))
+                if cote_under > 1.01:
+                    edge_under = proba_under * cote_under - 1
+                    if edge_under > 0.02 and ensemble.score <= 5.0:
+                        mise_under = round(1000 * edge_under * 0.15, 2)
+            except Exception:
+                pass
+
         return {
             "match_id": match.get("id") or match.get("event_id"),
             "home": home,
@@ -265,6 +284,10 @@ class MatchPipeline:
             "proba_over": round(proba_over, 3),
             "edge": round(edge, 3),
             "mise_kelly": mise,
+            "is_under_bet": is_under_bet,
+            "proba_under": proba_under,
+            "edge_under": round(edge_under, 4) if edge_under is not None else None,
+            "mise_under": mise_under,
             "layers": {str(r.layer_id): round(r.score, 2) for r in results},
             "warnings": warnings,
             "result": None,
