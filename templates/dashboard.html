@@ -6,71 +6,118 @@
     <title>Kenny Football — Pronostics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { padding-bottom: 90px; }
+        body { padding-bottom: 90px; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
         .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
         .tab-active { color: #10b981; }
         .tab-active .tab-icon { transform: scale(1.15); }
         .fade-in { animation: fadeIn .25s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        .market-btn { transition: all .15s; }
+        .market-btn.active { background-color: #10b981; color: white; box-shadow: 0 0 0 2px #10b981; }
+        .filter-btn { transition: all .15s; }
+        .filter-btn.active { background-color: #10b981; color: white; }
+        .match-card { transition: transform .15s, box-shadow .15s; }
+        .match-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
+        .league-title { font-size: 1.15rem; letter-spacing: 0.02em; }
+        .pulse-live { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
 
-    <header class="bg-gray-800/90 backdrop-blur border-b border-gray-700 sticky top-0 z-30">
+    <!-- HEADER -->
+    <header class="bg-gray-800/95 backdrop-blur border-b border-gray-700 sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
             <div>
-                <h1 class="text-xl font-bold text-white">⚽ Kenny Football</h1>
+                <h1 class="text-xl font-bold text-white tracking-tight">⚽ Kenny Football</h1>
                 <p class="text-xs text-gray-400" id="scheduler-status">—</p>
             </div>
-            <button id="btn-analyze" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition text-white text-sm font-bold px-3 py-2 rounded-lg">
+            <button id="btn-analyze" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition text-white text-sm font-bold px-4 py-2 rounded-lg shadow-lg">
                 <span id="btn-analyze-text">🔍 Analyser</span>
-                <span id="btn-analyze-progress" class="hidden ml-1 text-xs"></span>
             </button>
         </div>
     </header>
 
     <main class="max-w-6xl mx-auto p-4">
 
+        <!-- VUE ACCUEIL -->
         <section id="view-home" class="view fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white">📅 Aujourd'hui</h2>
+                    <p class="text-xs text-gray-400" id="home-date">—</p>
+                </div>
+                <div id="home-stats-quick" class="text-right text-xs text-gray-400"></div>
+            </div>
+
+            <!-- Marchés -->
+            <div class="mb-5">
+                <div class="text-xs uppercase tracking-wider text-gray-500 mb-2 font-bold">Marché</div>
+                <div class="flex gap-2 overflow-x-auto pb-2">
+                    <button data-market="2.5" class="market-btn active bg-gray-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">⚽ Over/Under 2.5</button>
+                    <button data-market="1x2" class="market-btn bg-gray-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap opacity-50">🏆 1X2 (bientôt)</button>
+                    <button data-market="btts" class="market-btn bg-gray-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap opacity-50">🎯 BTTS (bientôt)</button>
+                </div>
+            </div>
+
+            <!-- Filtres Over/Under -->
+            <div id="ou-filters" class="mb-5">
+                <div class="text-xs uppercase tracking-wider text-gray-500 mb-2 font-bold">Type de pari</div>
+                <div class="flex gap-2">
+                    <button data-filter="all" class="filter-btn active bg-gray-700 px-4 py-2 rounded-lg text-sm font-bold">Tous</button>
+                    <button data-filter="over" class="filter-btn bg-gray-700 px-4 py-2 rounded-lg text-sm font-bold">📈 Over</button>
+                    <button data-filter="under" class="filter-btn bg-gray-700 px-4 py-2 rounded-lg text-sm font-bold">📉 Under</button>
+                </div>
+            </div>
+
             <div id="home-status" class="text-gray-400 text-sm mb-4"></div>
-            <div id="home-stats" class="grid grid-cols-2 gap-3 mb-4"></div>
+            <div id="home-stats" class="grid grid-cols-3 gap-3 mb-4"></div>
             <div id="home-results"></div>
         </section>
 
+        <!-- VUE HISTORIQUE -->
         <section id="view-history" class="view hidden fade-in">
-            <h2 class="text-lg font-bold text-white mb-4">📜 Historique</h2>
-            <div id="history-global-stats" class="grid grid-cols-3 gap-3 mb-4"></div>
+            <div class="mb-4">
+                <h2 class="text-xl font-bold text-white">📜 Historique</h2>
+                <p class="text-xs text-gray-400">Matchs terminés · vérification toutes les heures</p>
+            </div>
+
+            <div id="history-global-stats" class="grid grid-cols-3 gap-3 mb-5"></div>
             <div id="history-list" class="space-y-2"></div>
+            <div class="mt-4">
+                <button onclick="verifierTous()" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-3 py-3 rounded-lg">
+                    🔄 Vérifier les résultats
+                </button>
+            </div>
             <div id="history-detail" class="mt-6"></div>
         </section>
 
+        <!-- VUE ABONNEMENT -->
         <section id="view-subscription" class="view hidden fade-in">
-            <h2 class="text-lg font-bold text-white mb-4">💎 Abonnement</h2>
+            <h2 class="text-xl font-bold text-white mb-4">💎 Abonnement</h2>
             <div class="bg-gray-800 rounded-xl p-6 text-center border border-gray-700">
-                <p class="text-gray-400 mb-4">Formule Pro — accès aux 24 couches, alertes Telegram, mises Kelly illimitées.</p>
-                <button class="bg-emerald-600 hover:bg-emerald-700 px-6 py-3 rounded-lg font-bold text-white">
-                    Bientôt disponible
-                </button>
-                <p class="text-xs text-gray-500 mt-4">Version gratuite : 6 couches · 13 ligues · refresh 30 min</p>
+                <p class="text-gray-400 mb-4">Formule Pro — 24 couches, alertes Telegram, Kelly illimité.</p>
+                <button class="bg-emerald-600 px-6 py-3 rounded-lg font-bold text-white">Bientôt disponible</button>
+                <p class="text-xs text-gray-500 mt-4">Version gratuite : 13 couches · 13 ligues · refresh 30 min</p>
             </div>
         </section>
 
+        <!-- VUE MENU -->
         <section id="view-menu" class="view hidden fade-in">
-            <h2 class="text-lg font-bold text-white mb-4">☰ Menu</h2>
+            <h2 class="text-xl font-bold text-white mb-4">☰ Menu</h2>
             <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-3 text-sm">
                 <div class="flex justify-between"><span class="text-gray-400">Version</span><span id="menu-version">—</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Couches actives</span><span id="menu-layers">—</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">API-Football</span><span id="menu-apifb">—</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Scheduler</span><span id="menu-scheduler">—</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Jobs</span><span id="menu-jobs">—</span></div>
                 <hr class="border-gray-700">
-                <a href="/api/cron/status" target="_blank" class="block text-emerald-400 hover:underline">→ /api/cron/status</a>
                 <a href="/api/health" target="_blank" class="block text-emerald-400 hover:underline">→ /api/health</a>
-                <a href="/api/stats" target="_blank" class="block text-emerald-400 hover:underline">→ /api/stats</a>
+                <a href="/api/archive" target="_blank" class="block text-emerald-400 hover:underline">→ /api/archive</a>
             </div>
         </section>
     </main>
 
+    <!-- BOTTOM NAV -->
     <nav class="bottom-nav fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 z-40">
         <div class="max-w-6xl mx-auto grid grid-cols-4">
             <button data-tab="home" class="tab tab-active py-3 flex flex-col items-center text-xs font-bold transition">
@@ -89,6 +136,22 @@
     </nav>
 
     <script>
+    let currentMarket = '2.5';
+    let currentFilter = 'all';
+
+    // ========== FETCH SÉCURISÉ ==========
+    async function fetchJSON(url, opts) {
+        const res = await fetch(url, opts);
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Réponse non-JSON de', url, ':', text.slice(0, 300));
+            throw new Error('API a renvoyé du HTML (erreur serveur). Vérifie les logs.');
+        }
+    }
+
+    // ========== NAV TABS ==========
     function switchTab(tab) {
         document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
         document.getElementById('view-' + tab).classList.remove('hidden');
@@ -106,142 +169,240 @@
         t.addEventListener('click', () => switchTab(t.dataset.tab));
     });
 
+    // ========== MARCHÉS ==========
+    document.querySelectorAll('[data-market]').forEach(b => {
+        b.addEventListener('click', () => {
+            const mkt = b.dataset.market;
+            if (mkt !== '2.5') {
+                alert('Marché ' + mkt.toUpperCase() + ' en développement. Les données seront disponibles bientôt.');
+                return;
+            }
+            document.querySelectorAll('[data-market]').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            currentMarket = mkt;
+            document.getElementById('ou-filters').classList.remove('hidden');
+            loadHome();
+        });
+    });
+
+    // ========== FILTRES OVER/UNDER ==========
+    document.querySelectorAll('[data-filter]').forEach(b => {
+        b.addEventListener('click', () => {
+            document.querySelectorAll('[data-filter]').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            currentFilter = b.dataset.filter;
+            loadHome();
+        });
+    });
+
+    // ========== UTILS ==========
     function fmtTime(iso) {
         if (!iso) return '';
         try { return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
     }
     function fmtDate(iso) {
         if (!iso) return '';
-        try { return new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' }); } catch { return iso; }
+        try { return new Date(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch { return iso; }
     }
 
-    function renderMatch(m, retenu) {
-        const border = retenu ? 'border-emerald-600' : 'border-gray-700';
-        const badge = retenu ? 'bg-emerald-600' : 'bg-gray-600';
+    // ========== CARTE MATCH ==========
+    function renderMatchCard(m) {
+        const isUnder = !!m.is_under_bet;
+        const accent = isUnder ? 'border-l-blue-500' : 'border-l-emerald-500';
+        const badgeColor = isUnder ? 'bg-blue-600' : 'bg-emerald-600';
+        const badgeText = isUnder ? '📉 UNDER 2.5' : '📈 OVER 2.5';
         const kickoff = fmtTime(m.kickoff);
         const score = Number(m.score ?? 0).toFixed(2);
-        const proba = ((m.proba_over ?? 0) * 100).toFixed(0);
-        const edge = Number(m.edge ?? 0).toFixed(2);
+        const proba = isUnder
+            ? ((m.proba_under ?? (1 - (m.proba_over ?? 0))) * 100).toFixed(0)
+            : ((m.proba_over ?? 0) * 100).toFixed(0);
+        const edge = isUnder ? (m.edge_under ?? 0) : (m.edge ?? 0);
         const coteRaw = m.cote_over ?? '—';
-        const cSrc = m.cote_source || '';
+        const src = m.cote_source || '';
         let coteBadge = '';
-        if (cSrc.startsWith('estimated')) coteBadge = '<span class="text-yellow-500 text-xs" title="Cote estimée (Bzzoiro pas encore publiée)">~</span>';
-        else if (cSrc.startsWith('default')) coteBadge = '<span class="text-red-400 text-xs" title="Aucune cote disponible">⚠️</span>';
+        if (src.startsWith('estimated')) coteBadge = '<span class="text-yellow-500 text-xs">~</span>';
+        else if (src.startsWith('default')) coteBadge = '<span class="text-red-400 text-xs">⚠️</span>';
         const cote = `${coteRaw}${coteBadge}`;
-        const mise = Number(m.mise_kelly ?? 0).toFixed(2);
-        const league = m.league_name || (m.league_id ? `Ligue ${m.league_id}` : 'Ligue inconnue');
+        const mise = isUnder ? (m.mise_under ?? 0) : (m.mise_kelly ?? 0);
+        const league = m.league_name || `Ligue ${m.league_id}`;
+        const isRetenu = (mise || 0) > 0;
+
+        // Badges live/venir
+        let liveBadge = '';
+        if (!m.result && m.kickoff) {
+            const ko = new Date(m.kickoff);
+            const now = new Date();
+            if (ko > now) {
+                liveBadge = '<span class="bg-yellow-600/80 text-white px-2 py-0.5 rounded text-xs ml-2">⏳ À venir</span>';
+            } else if (now - ko < 2.5 * 60 * 60 * 1000) {
+                liveBadge = '<span class="bg-red-600 text-white px-2 py-0.5 rounded text-xs ml-2 pulse-live">🔴 LIVE</span>';
+            }
+        }
+
+        // Verdict si terminé
+        let verdictBlock = '';
+        if (m.result) {
+            const r = m.result;
+            const vColor = r.verdict === '✓' ? 'text-emerald-400' : 'text-red-400';
+            const vBg = r.verdict === '✓' ? 'bg-emerald-900/50' : 'bg-red-900/50';
+            verdictBlock = `
+                <div class="${vBg} border border-gray-700 rounded-lg p-3 mt-3 flex justify-between items-center">
+                    <div>
+                        <div class="text-xs text-gray-400">Score final</div>
+                        <div class="text-lg font-bold text-white">${r.home_score} - ${r.away_score} <span class="text-xs text-gray-400">(${r.total_goals} buts)</span></div>
+                    </div>
+                    <div class="${vColor} text-4xl font-bold">${r.verdict}</div>
+                </div>`;
+        }
+
         return `
-            <div class="bg-gray-800 rounded-xl p-4 border ${border} mb-3">
-                <div class="flex justify-between items-start mb-2">
-                    <div class="flex-1 pr-2">
-                        <div class="font-bold text-white">${m.home || '?'} <span class="text-gray-500">vs</span> ${m.away || '?'}</div>
-                        <div class="text-xs text-gray-400 mt-1">${league}${kickoff ? ' · ' + kickoff : ''}</div>
-                    </div>
-                    <span class="${badge} text-white px-3 py-1 rounded-full text-sm font-bold whitespace-nowrap">${score}</span>
-                </div>
-                <div class="grid grid-cols-4 gap-2 text-xs mt-3">
-                    <div class="bg-gray-700 rounded p-2 text-center">
-                        <div class="text-gray-400">Over</div><div class="text-white font-bold">${proba}%</div>
-                    </div>
-                    <div class="bg-gray-700 rounded p-2 text-center">
-                        <div class="text-gray-400">Edge</div>
-                        <div class="${(m.edge ?? 0) > 0 ? 'text-emerald-400' : 'text-red-400'} font-bold">${edge}</div>
-                    </div>
-                    <div class="bg-gray-700 rounded p-2 text-center">
-                        <div class="text-gray-400">Cote</div><div class="text-white font-bold">${cote}</div>
-                    </div>
-                    <div class="bg-gray-700 rounded p-2 text-center">
-                        <div class="text-gray-400">Mise</div><div class="text-white font-bold">${mise}€</div>
+            <div class="match-card bg-gray-800 rounded-xl p-4 border-l-4 ${accent} border border-gray-700 mb-3 ${isRetenu ? 'ring-1 ring-emerald-500/30' : ''}">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="league-title font-extrabold text-white uppercase tracking-tight">${league}</div>
+                    <div class="flex items-center gap-1">
+                        ${kickoff ? `<span class="text-xs text-gray-400">${kickoff}</span>` : ''}
+                        ${liveBadge}
                     </div>
                 </div>
+                <div class="text-base font-bold text-white mb-3">
+                    ${m.home || '?'} <span class="text-gray-500 font-normal">vs</span> ${m.away || '?'}
+                </div>
+                <div class="flex items-center justify-between mb-3">
+                    <span class="${badgeColor} text-white px-3 py-1 rounded-full text-xs font-bold">${badgeText}</span>
+                    <span class="text-xs text-gray-400">Score modèle <strong class="text-white">${score}</strong></span>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-xs">
+                    <div class="bg-gray-700/60 rounded-lg p-2 text-center">
+                        <div class="text-gray-400 mb-0.5">Proba</div>
+                        <div class="text-white font-bold text-sm">${proba}%</div>
+                    </div>
+                    <div class="bg-gray-700/60 rounded-lg p-2 text-center">
+                        <div class="text-gray-400 mb-0.5">Edge</div>
+                        <div class="${(edge || 0) > 0 ? 'text-emerald-400' : 'text-red-400'} font-bold text-sm">${Number(edge || 0).toFixed(2)}</div>
+                    </div>
+                    <div class="bg-gray-700/60 rounded-lg p-2 text-center">
+                        <div class="text-gray-400 mb-0.5">Cote</div>
+                        <div class="text-white font-bold text-sm">${cote}</div>
+                    </div>
+                    <div class="bg-gray-700/60 rounded-lg p-2 text-center">
+                        <div class="text-gray-400 mb-0.5">Mise</div>
+                        <div class="${(mise || 0) > 0 ? 'text-emerald-400' : 'text-gray-300'} font-bold text-sm">${Number(mise || 0).toFixed(2)}€</div>
+                    </div>
+                </div>
+                ${verdictBlock}
             </div>`;
     }
 
-    async function loadHome() {
-        const status = document.getElementById('home-status');
-        const stats = document.getElementById('home-stats');
-        const results = document.getElementById('home-results');
-        status.textContent = '⏳ Chargement...';
-        stats.innerHTML = '';
-        results.innerHTML = '';
-        try {
-            const res = await fetch('/api/predictions');
-            const data = await res.json();
-            const matches = data.matches || [];
-            const retenus = matches.filter(m => m.retenu);
-            const rejetes = matches.filter(m => !m.retenu);
-            if (matches.length === 0) {
-                status.innerHTML = `📭 Aucune prédiction encore.<br><span class="text-xs text-gray-500">Le cron tourne à 00h, ou clique sur 🔍 Analyser.</span>`;
-            } else {
-                status.textContent = `✅ ${matches.length} matchs · ${retenus.length} retenus · maj ${fmtTime(data.last_update)}`;
-            }
-            stats.innerHTML = `
-                <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                    <div class="text-2xl font-bold text-emerald-400">${retenus.length}</div>
-                    <div class="text-sm text-gray-400">Retenus</div>
-                </div>
-                <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                    <div class="text-2xl font-bold text-gray-300">${matches.length}</div>
-                    <div class="text-sm text-gray-400">Analysés</div>
-                </div>`;
-            if (retenus.length > 0) {
-                results.innerHTML += `<h2 class="text-lg font-bold text-emerald-400 mb-3 mt-4">✅ Retenus (score ≥ 8)</h2>`;
-                results.innerHTML += retenus.map(m => renderMatch(m, true)).join('');
-            }
-            if (rejetes.length > 0) {
-                results.innerHTML += `<h2 class="text-lg font-bold text-gray-400 mb-3 mt-6">❌ Rejetés</h2>`;
-                results.innerHTML += rejetes.map(m => renderMatch(m, false)).join('');
-            }
-        } catch (e) { status.textContent = '❌ ' + e.message; }
+    // ========== GROUPER PAR CHAMPIONNAT ==========
+    function groupByLeague(matches) {
+        const groups = {};
+        matches.forEach(m => {
+            const key = m.league_name || `Ligue ${m.league_id}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(m);
+        });
+        return groups;
     }
 
-    document.getElementById('btn-analyze').addEventListener('click', analyzeStart);
+    // ========== VUE ACCUEIL ==========
+    async function loadHome() {
+        const status = document.getElementById('home-status');
+        const results = document.getElementById('home-results');
+        const quickStats = document.getElementById('home-stats-quick');
+        const statsDiv = document.getElementById('home-stats');
+        const dateEl = document.getElementById('home-date');
 
-    async function analyzeStart() {
+        dateEl.textContent = fmtDate(new Date().toISOString().split('T')[0]);
+        status.textContent = '⏳ Chargement...';
+        results.innerHTML = '';
+        quickStats.textContent = '';
+        statsDiv.innerHTML = '';
+
+        try {
+            let url = '/api/predictions';
+            if (currentFilter !== 'all') url = `/api/predictions/filtered?kind=${currentFilter}`;
+            const data = await fetchJSON(url);
+            const matches = data.matches || [];
+
+            if (matches.length === 0) {
+                status.innerHTML = `📭 Aucun match actif.<br><span class="text-xs text-gray-500">Clique sur 🔍 Analyser.</span>`;
+                return;
+            }
+
+            const over = matches.filter(m => !m.is_under_bet);
+            const under = matches.filter(m => m.is_under_bet);
+            const retenus = matches.filter(m => (m.mise_kelly || 0) > 0 || (m.mise_under || 0) > 0);
+            const rejetes = matches.length - retenus.length;
+
+            status.textContent = `${matches.length} match${matches.length > 1 ? 's' : ''} · maj ${fmtTime(data.last_update)}`;
+            quickStats.innerHTML = `<span class="text-emerald-400 font-bold">${over.length}</span> Over · <span class="text-blue-400 font-bold">${under.length}</span> Under · <span class="text-white font-bold">${retenus.length}</span> retenus`;
+
+            statsDiv.innerHTML = `
+                <div class="bg-gray-800 rounded-xl p-3 border border-gray-700 text-center">
+                    <div class="text-2xl font-bold text-emerald-400">${retenus.length}</div>
+                    <div class="text-xs text-gray-400">Retenus</div>
+                </div>
+                <div class="bg-gray-800 rounded-xl p-3 border border-gray-700 text-center">
+                    <div class="text-2xl font-bold text-gray-300">${matches.length}</div>
+                    <div class="text-xs text-gray-400">Analysés</div>
+                </div>
+                <div class="bg-gray-800 rounded-xl p-3 border border-gray-700 text-center">
+                    <div class="text-2xl font-bold text-red-400">${rejetes}</div>
+                    <div class="text-xs text-gray-400">Rejetés</div>
+                </div>`;
+
+            const groups = groupByLeague(matches);
+            const sortedLeagues = Object.keys(groups).sort();
+
+            sortedLeagues.forEach(league => {
+                const leagueMatches = groups[league];
+                const section = document.createElement('div');
+                section.className = 'mb-6';
+                section.innerHTML = `
+                    <div class="flex items-center justify-between mb-2 px-1">
+                        <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wider">${league}</h3>
+                        <span class="text-xs text-gray-500">${leagueMatches.length} match${leagueMatches.length > 1 ? 's' : ''}</span>
+                    </div>
+                    <div>${leagueMatches.map(renderMatchCard).join('')}</div>`;
+                results.appendChild(section);
+            });
+        } catch (e) {
+            status.textContent = '❌ ' + e.message;
+        }
+    }
+
+    // ========== BOUTON ANALYSER ==========
+    document.getElementById('btn-analyze').addEventListener('click', async () => {
         const btn = document.getElementById('btn-analyze');
         const txt = document.getElementById('btn-analyze-text');
-        const prog = document.getElementById('btn-analyze-progress');
         const status = document.getElementById('home-status');
         btn.disabled = true;
         txt.textContent = '⏳ Démarrage...';
-        status.textContent = '🔍 Récupération + pré-filtre...';
+        status.textContent = '🔍 Analyse en cours...';
         try {
-            const res = await fetch('/api/analyze/start?limit=200', { method: 'POST' });
-            const data = await res.json();
-            if (!data.success) {
-                status.textContent = '⚠️ ' + (data.error || 'Erreur');
-                btn.disabled = false; txt.textContent = '🔍 Analyser';
-                return;
-            }
-            status.textContent = `📊 ${data.total_bzzoiro} Bzzoiro → ${data.filtered} analysables...`;
+            const data = await fetchJSON('/api/analyze/start?limit=200', { method: 'POST' });
+            if (!data.success) { status.textContent = '⚠️ ' + data.error; btn.disabled = false; txt.textContent = '🔍 Analyser'; return; }
+            status.textContent = `📊 ${data.total_bzzoiro} → ${data.filtered} analysables...`;
             pollJob(data.job_id);
-        } catch (e) {
-            status.textContent = '❌ ' + e.message;
-            btn.disabled = false; txt.textContent = '🔍 Analyser';
-        }
-    }
+        } catch (e) { status.textContent = '❌ ' + e.message; btn.disabled = false; txt.textContent = '🔍 Analyser'; }
+    });
 
     async function pollJob(jobId) {
         const btn = document.getElementById('btn-analyze');
         const txt = document.getElementById('btn-analyze-text');
-        const prog = document.getElementById('btn-analyze-progress');
         const status = document.getElementById('home-status');
         while (true) {
             try {
-                const res = await fetch(`/api/analyze/status/${jobId}`);
-                const j = await res.json();
+                const j = await fetchJSON(`/api/analyze/status/${jobId}`);
                 if (j.status === 'running' || j.status === 'queued') {
                     const done = j.done || 0, total = j.total || 0;
-                    const pct = total ? Math.round(done * 100 / total) : 0;
-                    txt.textContent = '⏳ Analyse';
-                    prog.textContent = `${done}/${total}`;
-                    prog.classList.remove('hidden');
-                    status.textContent = `⚙️ ${done}/${total} (${pct}%) · ${j.retenus || 0} retenus`;
+                    txt.textContent = `⏳ ${done}/${total}`;
+                    status.textContent = `⚙️ ${done}/${total} · ${j.retenus || 0} retenus`;
                 } else if (j.status === 'done') {
-                    status.textContent = `✅ ${j.total} analysés · ${j.retenus} retenus`;
+                    status.textContent = `✅ ${j.total} analysés`;
                     break;
                 } else if (j.status === 'error') {
-                    status.textContent = '❌ ' + (j.error || 'Erreur job');
+                    status.textContent = '❌ ' + (j.error || 'Erreur');
                     break;
                 }
             } catch (e) { status.textContent = '❌ ' + e.message; break; }
@@ -249,10 +410,10 @@
         }
         btn.disabled = false;
         txt.textContent = '🔍 Analyser';
-        prog.classList.add('hidden');
         loadHome();
     }
 
+    // ========== HISTORIQUE ==========
     async function loadHistory() {
         const list = document.getElementById('history-list');
         const detail = document.getElementById('history-detail');
@@ -261,30 +422,33 @@
         detail.innerHTML = '';
         gs.innerHTML = '';
         try {
-            const sRes = await fetch('/api/stats');
-            const stats = await sRes.json();
-            if (stats.total_verified > 0) {
+            const data = await fetchJSON('/api/archive');
+            const items = data.archive || [];
+            if (items.length === 0) {
+                list.innerHTML = '<div class="text-gray-500 text-sm">Aucun match terminé pour l\'instant.</div>';
+                return;
+            }
+
+            const totalCorrect = items.reduce((s, i) => s + (i.correct || 0), 0);
+            const totalWrong = items.reduce((s, i) => s + (i.wrong || 0), 0);
+            const acc = totalCorrect + totalWrong > 0 ? (totalCorrect / (totalCorrect + totalWrong)) : null;
+
+            if (acc !== null) {
                 gs.innerHTML = `
                     <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
-                        <div class="text-2xl font-bold text-emerald-400">${stats.total_correct}</div>
+                        <div class="text-2xl font-bold text-emerald-400">${totalCorrect}</div>
                         <div class="text-xs text-gray-400">✓ Corrects</div>
                     </div>
                     <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
-                        <div class="text-2xl font-bold text-red-400">${stats.total_wrong}</div>
+                        <div class="text-2xl font-bold text-red-400">${totalWrong}</div>
                         <div class="text-xs text-gray-400">× Ratés</div>
                     </div>
                     <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
-                        <div class="text-2xl font-bold text-white">${(stats.accuracy * 100).toFixed(1)}%</div>
+                        <div class="text-2xl font-bold text-white">${(acc * 100).toFixed(1)}%</div>
                         <div class="text-xs text-gray-400">Précision</div>
                     </div>`;
             }
-            const res = await fetch('/api/history');
-            const data = await res.json();
-            const items = data.history || [];
-            if (items.length === 0) {
-                list.innerHTML = `<div class="text-gray-500 text-sm">Aucun historique.</div>`;
-                return;
-            }
+
             list.innerHTML = items.map(it => {
                 const v = it.verified || 0, c = it.correct || 0, w = it.wrong || 0;
                 const badge = v > 0
@@ -295,11 +459,10 @@
                         <div class="flex justify-between items-center">
                             <div>
                                 <div class="font-bold text-white">${fmtDate(it.date)}</div>
-                                <div class="text-xs text-gray-500">${it.total} matchs · maj ${fmtTime(it.last_update)}</div>
+                                <div class="text-xs text-gray-500">${it.over_count || 0}📈 · ${it.under_count || 0}📉 · ${it.total} matchs</div>
                             </div>
                             <div class="text-right">
                                 <div class="text-sm font-bold">${badge}</div>
-                                <div class="text-xs text-gray-400">${it.retenus} retenus</div>
                             </div>
                         </div>
                     </button>`;
@@ -311,70 +474,55 @@
         const detail = document.getElementById('history-detail');
         detail.innerHTML = '⏳ Chargement...';
         try {
-            const res = await fetch('/api/predictions/' + d);
-            const data = await res.json();
+            const data = await fetchJSON('/api/predictions/' + d);
             const matches = data.matches || [];
-            const retenus = matches.filter(m => m.retenu);
-            const rejetes = matches.filter(m => !m.retenu);
-            let html = `<h3 class="text-md font-bold text-white mb-3">${fmtDate(d)} — ${retenus.length} retenus / ${matches.length}</h3>`;
-            html += `<button onclick="verifierResultats('${d}')" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-3 py-2 rounded-lg mb-4">🔍 Vérifier les résultats</button>`;
-            if (retenus.length) {
-                html += `<h4 class="text-sm font-bold text-emerald-400 mb-2">✅ Retenus</h4>`;
-                html += retenus.map(m => renderMatchWithResult(m, true)).join('');
-            }
-            if (rejetes.length) {
-                html += `<h4 class="text-sm font-bold text-gray-400 mb-2 mt-4">❌ Rejetés</h4>`;
-                html += rejetes.map(m => renderMatchWithResult(m, false)).join('');
-            }
+            const finished = matches.filter(m => m.result);
+
+            let html = `<h3 class="text-md font-bold text-white mb-3">${fmtDate(d)} — ${finished.length} matchs terminés</h3>`;
+
+            const groups = groupByLeague(finished);
+            Object.keys(groups).sort().forEach(league => {
+                html += `<div class="mb-6">
+                    <h4 class="text-sm font-bold text-gray-300 uppercase tracking-wider mb-2">${league}</h4>
+                    <div>${groups[league].map(renderMatchCard).join('')}</div>
+                </div>`;
+            });
+
             detail.innerHTML = html;
             detail.scrollIntoView({ behavior: 'smooth' });
         } catch (e) { detail.innerHTML = '❌ ' + e.message; }
     }
 
-    function renderMatchWithResult(m, retenu) {
-        const base = renderMatch(m, retenu);
-        if (!m.result) return base;
-        const r = m.result;
-        const vColor = r.verdict === '✓' ? 'text-emerald-400' : (r.verdict === '×' ? 'text-red-400' : 'text-gray-400');
-        const vBg = r.verdict === '✓' ? 'bg-emerald-900' : (r.verdict === '×' ? 'bg-red-900' : 'bg-gray-800');
-        const sColor = r.over_2_5_real ? 'text-emerald-300' : 'text-gray-300';
-        const inj = `
-            <div class="${vBg} border border-gray-700 rounded-lg p-2 mt-2 flex justify-between items-center text-xs">
-                <div>
-                    <span class="text-gray-400">Score réel :</span>
-                    <span class="${sColor} font-bold">${r.home_score}-${r.away_score}</span>
-                    <span class="text-gray-500">(${r.total_goals} buts)</span>
-                    <span class="text-gray-400 ml-2">Prédit :</span>
-                    <span class="text-white">${(r.proba * 100).toFixed(0)}% Over</span>
-                </div>
-                <div class="${vColor} text-2xl font-bold">${r.verdict}</div>
-            </div>`;
-        return base.replace(/<\/div>\s*$/, inj + '</div>');
-    }
-
-    async function verifierResultats(d) {
+    async function verifierTous() {
+        const btn = event.target;
+        btn.disabled = true;
+        btn.textContent = '⏳...';
         try {
-            const res = await fetch('/api/resultats/' + d, { method: 'POST' });
-            const data = await res.json();
-            if (data.success) loadHistoryDetail(d);
-            else alert('Erreur : ' + data.error);
+            const today = new Date().toISOString().split('T')[0];
+            await fetchJSON('/api/resultats/' + today, { method: 'POST' });
+            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+            await fetchJSON('/api/resultats/' + yesterday, { method: 'POST' });
+            loadHistory();
         } catch (e) { alert('Erreur : ' + e.message); }
+        finally {
+            btn.disabled = false;
+            btn.textContent = '🔄 Vérifier les résultats';
+        }
     }
 
+    // ========== MENU ==========
     async function loadMenu() {
         try {
-            const [hRes, cRes] = await Promise.all([fetch('/api/health'), fetch('/api/cron/status')]);
-            const h = await hRes.json();
-            const c = await cRes.json();
+            const [h, c] = await Promise.all([fetchJSON('/api/health'), fetchJSON('/api/cron/status')]);
             document.getElementById('menu-version').textContent = h.version || '—';
             document.getElementById('menu-layers').textContent = h.layers ?? '—';
-            document.getElementById('menu-apifb').textContent = h.api_football || '—';
             document.getElementById('menu-scheduler').textContent = c.scheduler_running ? '✅ running' : '⏸ stopped';
             document.getElementById('menu-jobs').textContent = (c.jobs || []).map(j => j.id).join(', ') || '—';
-            document.getElementById('scheduler-status').textContent = c.scheduler_running ? '⏰ Scheduler actif' : '⏸ Scheduler arrêté';
+            document.getElementById('scheduler-status').textContent = c.scheduler_running ? '⏰ Scheduler actif' : '⏸ Arrêté';
         } catch (e) { console.error(e); }
     }
 
+    // ========== INIT ==========
     document.addEventListener('DOMContentLoaded', () => {
         loadHome();
         loadMenu();
