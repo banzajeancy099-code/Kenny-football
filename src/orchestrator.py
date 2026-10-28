@@ -224,15 +224,16 @@ class MatchPipeline:
         edge = proba_over * cote_over - 1
 
         mise = 0.0
-        if edge > 0.05 and ensemble.score >= 5.5:
+        if edge >= 0.10 and ensemble.score >= 5.2:
             mise = round(1000 * edge * 0.05, 2)
+            mise = min(mise, 30.0)  # CAP à 3% de bankroll
 
         retenu = (
             ensemble.score >= 5.5
             and proba_over >= 0.55
-            and ensemble.confidence >= 0.7
+            and ensemble.confidence >= 0.65
             and ensemble.std < 1.5
-            and 0.10 <= edge <= 0.20   # ← filtre optimal backtest
+            and edge >= 0.10   # ← edge minimum, pas de plafond
         )
 
         league_id = match.get("league_id") or (match.get("league") or {}).get("id")
@@ -262,8 +263,9 @@ class MatchPipeline:
                 cote_under = 1.0 / (1.0 - (1.0 / cote_over))
                 if cote_under > 1.01:
                     edge_under = proba_under * cote_under - 1
-                    if 0.10 <= edge_under <= 0.20 and ensemble.score <= 5.0:
+                    if edge_under >= 0.10 and ensemble.score <= 5.2:
                         mise_under = round(1000 * edge_under * 0.05, 2)
+                        mise_under = min(mise_under, 30.0)  # CAP
             except Exception:
                 pass
 
