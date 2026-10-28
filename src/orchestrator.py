@@ -205,17 +205,29 @@ class MatchPipeline:
         league_key = str(match.get("league_id", "default"))
         ensemble = self.scorer.score(results, league=league_key)
 
-        proba_over = min(0.95, max(0.05, ensemble.score / 10.0))
+        # Calibration non-linéaire basée sur backtest 191 matchs
+        raw_p = min(0.95, max(0.05, ensemble.score / 10.0))
+        if raw_p < 0.45:
+            proba_over = raw_p * 0.3
+        elif raw_p < 0.50:
+            proba_over = raw_p * 0.7
+        elif raw_p < 0.55:
+            proba_over = raw_p * 1.10
+        elif raw_p < 0.65:
+            proba_over = raw_p * 1.20
+        else:
+            proba_over = min(0.95, raw_p * 1.15)
 
         cote_over, cote_source = self._get_cote_over(match)
         edge = proba_over * cote_over - 1
 
         mise = 0.0
-        if edge > 0.05 and ensemble.score >= 8.0:
+        if edge > 0.05 and ensemble.score >= 5.5:
             mise = round(1000 * edge * 0.15, 2)
 
         retenu = (
-            ensemble.score >= 8.0
+            ensemble.score >= 5.5
+            and proba_over >= 0.55
             and ensemble.confidence >= 0.7
             and ensemble.std < 1.5
         )
