@@ -1,0 +1,62 @@
+app:
+  name: "Kenny Football"
+  version: "1.0.0"
+  port: 3000
+
+leagues:
+  bundesliga:
+    id: 5
+    over_rate: 0.635
+  eredivisie:
+    id: 10
+    over_rate: 0.617
+  super_league_ch:
+    id: 15
+    over_rate: 0.78
+  eliteserien:
+    id: 54
+    over_rate: 0.622
+  mls:
+    id: 18
+    over_rate: 0.587
+  liga_mx:
+    id: 19
+    over_rate: 0.554
+  premier_league:
+    id: 1
+    over_rate: 0.55
+  brasileirao_serie_a:
+    id: 9
+    over_rate: 0.55
+  serie_a_italy:
+    id: 4
+    over_rate: 0.55
+  ligue_1:
+    id: 6
+    over_rate: 0.58
+  championship:
+    id: 12
+    over_rate: 0.54
+  pro_league_be:
+    id: 14
+    over_rate: 0.58
+  austrian_bundesliga:
+    id: 96
+    over_rate: 0.60
+
+thresholds:
+  score_min: 8.0
+  over_min: 6.0
+  confidence_min: 0.7
+  std_max: 1.5
+
+kelly:
+  fraction: 0.15
+  edge_min: 0.05
+  bankroll: 1000
+
+scheduler:
+  analyze_hour_start: 0
+  analyze_hour_end: 3
+  refresh_interval_min: 30
+  verify_hour: 4
