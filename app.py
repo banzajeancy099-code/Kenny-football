@@ -355,7 +355,7 @@ def index():
 @app.route("/api/health")
 def health():
     return jsonify({
-        "status": "ok", "version": "1.4.0", "layers": 13,
+        "status": "ok", "version": "1.4.0", "layers": len(pipeline.layers),
         "api_football": "enabled" if api_football else "disabled",
         "scheduler": "running" if scheduler.running else "stopped",
         "jobs": [j.id for j in scheduler.get_jobs()] if scheduler.running else [],
