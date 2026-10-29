@@ -18,6 +18,7 @@ import yaml
 from src.clients.bzzoiro import BzzoiroClient
 from src.clients.api_football import APIFootballClient
 from src.orchestrator import MatchPipeline, prefilter
+from src.db import init_db, save_predictions as db_save, load_predictions as db_load, get_archive
 
 # ========== LOGGER ==========
 logging.basicConfig(
@@ -87,6 +88,8 @@ if os.environ.get("API_FOOTBALL_KEY"):
 else:
     log.warning("⚠️  API-Football désactivé")
 
+init_db()  # Crée les tables Neon
+
 pipeline = MatchPipeline(
     bzzoiro=bzzoiro,
     api_football=api_football,
@@ -102,18 +105,29 @@ def _pred_file(d=None):
 
 
 def load_predictions(d=None):
+    d = d or date.today()
+    # Essai DB d'abord
+    db_data = db_load(d)
+    if db_data:
+        return db_data
+    # Fallback JSON
     f = _pred_file(d)
     if not f.exists():
-        return {"date": (d or date.today()).isoformat(), "last_update": None, "matches": {}}
+        return {"date": d.isoformat(), "last_update": None, "matches": {}}
     try:
         with open(f, "r", encoding="utf-8") as fh:
             return json.load(fh)
     except Exception as e:
         log.warning(f"Erreur lecture {f}: {e}")
-        return {"date": (d or date.today()).isoformat(), "last_update": None, "matches": {}}
+        return {"date": d.isoformat(), "last_update": None, "matches": {}}
 
 
 def save_predictions(data, d=None):
+    d = d or date.today()
+    # Essai DB d'abord
+    if db_save(d, data):
+        return
+    # Fallback JSON
     f = _pred_file(d)
     tmp = f.with_suffix(".json.tmp")
     with open(tmp, "w", encoding="utf-8") as fh:
@@ -530,7 +544,11 @@ def predictions_by_date(date_str):
 
 @app.route("/api/archive")
 def archive():
-    """Liste des jours avec AU MOINS UN match terminé."""
+    """Liste des jours avec AU MOINS UN match terminé (DB Neon)."""
+    db_archive = get_archive(limit=90)
+    if db_archive:
+        return jsonify({"archive": db_archive, "total_days": len(db_archive), "source": "neon"})
+    # Fallback : JSON local
     files = sorted(DATA_DIR.glob("predictions_*.json"), reverse=True)
     out = []
     for f in files:

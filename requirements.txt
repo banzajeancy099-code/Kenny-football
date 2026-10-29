@@ -5,3 +5,5 @@ pyyaml>=6.0
 apscheduler>=3.10.0
 python-dateutil>=2.8.2
 atoma>=0.0.17
+psycopg2-binary>=2.9.9
+psycopg2>=2.9.0
