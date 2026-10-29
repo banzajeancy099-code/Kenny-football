@@ -458,7 +458,9 @@ def predictions_today():
 
     retenus_count = sum(
         1 for m in active
-        if m.get("retenu") or (m.get("mise_kelly") or 0) > 0 or (m.get("mise_under") or 0) > 0
+        if (m.get("retenu") or (m.get("mise_kelly") or 0) > 0
+            or (m.get("mise_under") or 0) > 0
+            or (m.get("mise_btts") or 0) > 0)
     )
     return jsonify({
         "date": today.isoformat(),

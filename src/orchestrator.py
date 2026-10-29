@@ -16,6 +16,11 @@ from src.layers.l24_standings_pressure import StandingsPressureLayer
 from src.layers.l12_geography import GeographyLayer
 from src.layers.l16_lifecycle import LifecycleLayer
 from src.layers.l14_xg import XGLayer
+from src.layers.l13_smart_money import SmartMoneyLayer
+from src.layers.l25_attack_x_attack import AttackXAttackLayer
+from src.layers.l26_defense_x_defense import DefenseXDefenseLayer
+from src.layers.l29_btts_history import BTTSHistoryLayer
+
 from src.scoring import BayesianScorer
 
 log = logging.getLogger("orchestrator")
@@ -133,6 +138,10 @@ class MatchPipeline:
             LineupsLayer(),
             LifecycleLayer(bzzoiro),
             XGLayer(bzzoiro),
+            SmartMoneyLayer(),
+            AttackXAttackLayer(bzzoiro),
+            DefenseXDefenseLayer(bzzoiro),
+            BTTSHistoryLayer(bzzoiro),
             RefereeLayer(),
             ContextLayer(),
             StandingsPressureLayer(),
@@ -141,6 +150,35 @@ class MatchPipeline:
             FatigueLayer(bzzoiro),
         ]
         self.scorer = BayesianScorer(weights)
+
+    def _get_cotes(self, match):
+        """Retourne (cotes_dict, source)."""
+        match_id = match.get("id") or match.get("event_id")
+        if not match_id:
+            return {"over_2_5": 2.0, "btts_yes": None, "btts_no": None}, "default"
+
+        try:
+            odds_json = self.bzzoiro.get_event_odds(match_id)
+            if not isinstance(odds_json, dict):
+                return {"over_2_5": 2.0, "btts_yes": None, "btts_no": None}, "default"
+
+            odds = odds_json.get("odds")
+            if not isinstance(odds, dict):
+                return {"over_2_5": 2.0, "btts_yes": None, "btts_no": None}, "default"
+
+            over = odds.get("over_25_goals")
+            btts_yes = odds.get("btts_yes")
+            btts_no = odds.get("btts_no")
+
+            return {
+                "over_2_5": float(over) if over is not None and over > 1.01 else None,
+                "btts_yes": float(btts_yes) if btts_yes is not None and btts_yes > 1.01 else None,
+                "btts_no": float(btts_no) if btts_no is not None and btts_no > 1.01 else None,
+            }, "api"
+        except Exception as e:
+            log.debug(f"[ODDS] {match_id} : {e}")
+            return {"over_2_5": 2.0, "btts_yes": None, "btts_no": None}, "default"
+
 
     def _get_cote_over(self, match):
         """Retourne (cote_over, source)."""
@@ -222,7 +260,11 @@ class MatchPipeline:
         else:
             proba_over = min(0.95, raw_p * 1.15)
 
-        cote_over, cote_source = self._get_cote_over(match)
+        cotes_dict, cote_source = self._get_cotes(match)
+        cote_over = cotes_dict.get("over_2_5") or 2.0
+        cote_btts_yes = cotes_dict.get("btts_yes")
+        cote_btts_no = cotes_dict.get("btts_no")
+        log.info(f"[DEBUG COTES] cotes_dict={cotes_dict} cote_btts_yes={cote_btts_yes}")
         edge = proba_over * cote_over - 1
 
         mise = 0.0
@@ -270,6 +312,26 @@ class MatchPipeline:
                         mise_under = min(mise_under, 30.0)  # CAP
             except Exception:
                 pass
+        # Score BTTS (couches 25, 26, 29)
+        layers_dict = {str(r.layer_id): r.score for r in results}
+        l25 = layers_dict.get("25", 5.0)
+        l26 = layers_dict.get("26", 5.0)
+        l29 = layers_dict.get("29", 5.0)
+        l1 = layers_dict.get("1", 5.0)
+        score_btts = (l25 * 0.30) + (l26 * 0.25) + (l29 * 0.30) + (l1 * 0.15)
+        proba_btts = min(0.95, max(0.05, score_btts / 10.0))
+        edge_btts = None
+        mise_btts = 0.0
+        retenu_btts = False
+        if cote_btts_yes and cote_btts_yes > 1.01:
+            edge_btts = proba_btts * cote_btts_yes - 1
+            if score_btts >= 6.5 and edge_btts >= 0.10:
+                retenu_btts = True
+                mise_btts = round(1000 * edge_btts * 0.10, 2)
+                mise_btts = min(mise_btts, 30.0)
+
+
+        log.info(f"[DEBUG FINAL] cote_btts_yes={cote_btts_yes} score_btts={score_btts}")
 
         return {
             "match_id": match.get("id") or match.get("event_id"),
@@ -294,6 +356,13 @@ class MatchPipeline:
             "edge_under": round(edge_under, 4) if edge_under is not None else None,
             "mise_under": mise_under,
             "layers": {str(r.layer_id): round(r.score, 2) for r in results},
+            "cote_btts_yes": cote_btts_yes,
+            "cote_btts_no": cote_btts_no,
+            "score_btts": round(score_btts, 2),
+            "proba_btts": round(proba_btts, 3),
+            "edge_btts": round(edge_btts, 4) if edge_btts is not None else None,
+            "mise_btts": mise_btts,
+            "retenu_btts": retenu_btts,
             "warnings": warnings,
             "result": None,
         }
