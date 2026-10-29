@@ -15,6 +15,7 @@ from src.layers.l11_league_shift import LeagueShiftLayer
 from src.layers.l24_standings_pressure import StandingsPressureLayer
 from src.layers.l12_geography import GeographyLayer
 from src.layers.l16_lifecycle import LifecycleLayer
+from src.layers.l14_xg import XGLayer
 from src.scoring import BayesianScorer
 
 log = logging.getLogger("orchestrator")
@@ -131,6 +132,7 @@ class MatchPipeline:
             MomentumLayer(bzzoiro),
             LineupsLayer(),
             LifecycleLayer(bzzoiro),
+            XGLayer(bzzoiro),
             RefereeLayer(),
             ContextLayer(),
             StandingsPressureLayer(),
@@ -225,7 +227,7 @@ class MatchPipeline:
 
         mise = 0.0
         if edge >= 0.10 and ensemble.score >= 5.2:
-            mise = round(1000 * edge * 0.05, 2)
+            mise = round(1000 * edge * 0.10, 2)
             mise = min(mise, 30.0)  # CAP à 3% de bankroll
 
         retenu = (
@@ -264,7 +266,7 @@ class MatchPipeline:
                 if cote_under > 1.01:
                     edge_under = proba_under * cote_under - 1
                     if edge_under >= 0.10 and ensemble.score <= 5.2:
-                        mise_under = round(1000 * edge_under * 0.05, 2)
+                        mise_under = round(1000 * edge_under * 0.10, 2)
                         mise_under = min(mise_under, 30.0)  # CAP
             except Exception:
                 pass
