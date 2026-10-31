@@ -202,10 +202,18 @@ def job_analyse_quotidienne():
 
 
 def job_refresh_cotes(force=False):
-    """Refresh cotes Bzzoiro + Pinnacle toutes les 30 min (00h-03h)."""
+    """Refresh cotes + snapshots Neon (17h-20h, 22h30, 00h-03h)."""
     now = datetime.now()
-    if not force and now.hour >= 3:
-        return
+    hour = now.hour
+    minute = now.minute
+    
+    if not force:
+        in_evening = (17 <= hour < 20)
+        in_final = (hour == 22 and minute >= 30)
+        in_night = (0 <= hour < 3)
+        if not (in_evening or in_final or in_night):
+            return
+    
     log.info(f"🔄 [CRON] Refresh cotes {now.strftime('%H:%M')}")
     try:
         today = date.today()
@@ -214,11 +222,16 @@ def job_refresh_cotes(force=False):
             return
 
         changed = 0
+        snapshots_saved = 0
         pinnacle_found = 0
         pinnacle_rejected = 0
         pinnacle_pending = 0
 
         for mid, pred in list(data["matches"].items()):
+            home = pred.get("home", "")
+            away = pred.get("away", "")
+            league_id = pred.get("league_id")
+
             # 1. Refresh cote Bzzoiro
             try:
                 odds = bzzoiro.get_event_odds(mid)
@@ -230,45 +243,53 @@ def job_refresh_cotes(force=False):
                         proba = pred.get("proba_over", 0)
                         edge = proba * new_cote - 1
                         pred["edge"] = round(edge, 3)
-                        mise = 0
-                        if edge >= 0.10 and pred.get("score", 0) >= 5.2:
-                            mise = min(round(1000 * edge * 0.10, 2), 30.0)
-                        pred["mise_kelly"] = mise
                         changed += 1
             except Exception as e:
                 log.debug(f"[CRON] refresh Bzzoiro {mid}: {e}")
 
-            # 2. Refresh cote Pinnacle (si retenu)
-            if pred.get("retenu") or (pred.get("mise_kelly", 0) > 0):
-                try:
-                    home = pred.get("home", "")
-                    away = pred.get("away", "")
-                    league_id = pred.get("league_id")
-                    pinnacle = pinnapi_client.find_fixture_odds(home, away, league_id=league_id)
-
-                    if pinnacle and pinnacle.get("over_2_5"):
-                        pinnacle_found += 1
-                        cote_pin = pinnacle["over_2_5"]
+            # 2. Snapshot Pinnacle pour TOUS les matchs
+            try:
+                pinnacle = pinnapi_client.find_fixture_odds(home, away, league_id=league_id)
+                if pinnacle and pinnacle.get("over_2_5"):
+                    pinnacle_found += 1
+                    cote_pin = pinnacle["over_2_5"]
+                    
+                    ok = db_save_odds_snapshot(
+                        timestamp=now,
+                        sport_key=f"soccer_{league_id}",
+                        home=home,
+                        away=away,
+                        best_over_2_5=cote_pin,
+                        bookmaker=pinnacle.get("bookmaker", "pinnacle")
+                    )
+                    if ok:
+                        snapshots_saved += 1
+                    
+                    if pred.get("retenu") or (pred.get("mise_kelly", 0) > 0):
                         proba = pred.get("proba_over", 0)
                         edge_pin = proba * cote_pin - 1
                         pred["cote_pinnacle_over"] = cote_pin
                         pred["edge_pinnacle"] = round(edge_pin, 4)
                         pred["pinnacle_status"] = "available"
 
-                        # Seuil Pinnacle adaptatif selon signal
-                        signal = pred.get("signal_strength", "medium")
-                        if signal == "strong":
-                            seuil_pin = 0.05
-                        elif signal == "medium":
-                            seuil_pin = 0.10
+                        score = pred.get("score", 5.0)
+                        conf = pred.get("confidence", 0.5)
+                        
+                        if (score >= 6.0 and proba >= 0.65 and edge_pin >= 0.15 and conf >= 0.65):
+                            signal = "strong"
+                        elif (score >= 5.5 and proba >= 0.55 and edge_pin >= 0.08 and conf >= 0.55):
+                            signal = "medium"
+                        elif (score >= 5.0 and proba >= 0.50 and edge_pin >= 0.05):
+                            signal = "weak"
                         else:
-                            seuil_pin = 0.15
-
-                        if edge_pin < seuil_pin:
+                            signal = "rejected"
+                        
+                        pred["signal_strength"] = signal
+                        
+                        if signal == "rejected":
                             pred["retenu"] = False
                             pred["mise_kelly"] = 0.0
                             pred["pinnacle_status"] = "rejected"
-                            pred["warnings"].append(f"Pinnacle: edge {edge_pin:+.2%} < {seuil_pin:.0%}")
                             pinnacle_rejected += 1
                         else:
                             if signal == "strong":
@@ -278,64 +299,19 @@ def job_refresh_cotes(force=False):
                             else:
                                 mise = min(round(1000 * edge_pin * 0.05, 2), 15.0)
                             pred["mise_kelly"] = mise
-                    else:
-                        if pred.get("pinnacle_status") != "available":
-                            pred["pinnacle_status"] = "pending"
-                            pinnacle_pending += 1
-                            warnings = pred.get("warnings", [])
-                            if not any("Pinnacle: cote pas encore publi" in w for w in warnings):
-                                warnings.append("Pinnacle: cote pas encore publiée (en attente)")
-                                pred["warnings"] = warnings
-                except Exception as e:
-                    log.debug(f"[CRON] refresh Pinnacle {mid}: {e}")
-
-            # 3. Refresh score LIVE (si match en cours)
-            try:
-                event = bzzoiro.request("GET", f"/events/{mid}/")
-                ev_data = event.get("results") if isinstance(event, dict) and "results" in event else event
-                if isinstance(ev_data, list) and ev_data:
-                    ev_data = ev_data[0]
-                if isinstance(ev_data, dict):
-                    status = str(ev_data.get("status") or "").lower()
-                    if status in ("live", "1h", "2h", "ht", "et", "p"):
-                        pred["live_score"] = {
-                            "home": ev_data.get("home_score"),
-                            "away": ev_data.get("away_score"),
-                        }
-                        pred["live_minute"] = ev_data.get("current_minute")
-                        pred["live_status"] = "live"
-                    elif status == "notstarted":
-                        pred["live_status"] = "notstarted"
-                        pred["live_score"] = None
-                        pred["live_minute"] = None
+                else:
+                    if pred.get("pinnacle_status") != "available":
+                        pred["pinnacle_status"] = "pending"
+                        pinnacle_pending += 1
             except Exception as e:
-                log.debug(f"[CRON] refresh live {mid}: {e}")
-
-        # Cap FORCÉ avant save
-        for mid, pred in data["matches"].items():
-            signal = pred.get("signal_strength", "medium")
-            if signal == "strong":
-                cap = 50.0
-            elif signal == "medium":
-                cap = 30.0
-            elif signal == "weak":
-                cap = 15.0
-            else:
-                cap = 0.0
-            if pred.get("mise_kelly", 0) > cap:
-                pred["mise_kelly"] = cap
-            if pred.get("mise_btts", 0) > cap:
-                pred["mise_btts"] = cap
-            if signal == "rejected":
-                pred["mise_kelly"] = 0.0
-                pred["mise_btts"] = 0.0
-                pred["mise_under"] = 0.0
+                log.debug(f"[CRON] refresh Pinnacle {mid}: {e}")
 
         data["last_update"] = now.isoformat()
         save_predictions(data, today)
-        log.info(f"✅ [CRON] Refresh : {changed} Bzzoiro · {pinnacle_found} Pinnacle · {pinnacle_rejected} rejetés · {pinnacle_pending} en attente")
+        log.info(f"✅ [CRON] Refresh : {changed} Bzzoiro · {snapshots_saved} snapshots · {pinnacle_found} Pinnacle · {pinnacle_rejected} rejetés · {pinnacle_pending} en attente")
     except Exception as e:
         log.error(f"❌ [CRON] Refresh échoué : {e}", exc_info=True)
+
 
 
 def _verifier_match(pred, event_id):
@@ -446,14 +422,40 @@ def _extract_over_odd(odds_json):
         return None
 
 
+
+# ========== RATTRAPAGE AU DEMARRAGE ==========
+def catch_up_analysis_if_needed():
+    """Si l'analyse du jour n'a pas été faite, la lancer immédiatement.
+    Utile si Render redémarre après 00h00 (job manqué)."""
+    try:
+        from datetime import date
+        from src.db import load_predictions as db_load
+        today = date.today()
+        data = db_load(today)
+        if not data.get("matches"):
+            log.info("🔄 Rattrapage : analyse du jour absente, lancement immédiat...")
+            job_analyse_quotidienne()
+        else:
+            log.info(f"✅ Analyse du jour déjà présente ({len(data.get('matches', {}))} matchs)")
+    except Exception as e:
+        log.error(f"❌ Rattrapage échoué : {e}", exc_info=True)
+
+
+def _start_catchup_thread():
+    """Lance le rattrapage dans un thread pour ne pas bloquer Flask."""
+    import threading
+    t = threading.Thread(target=catch_up_analysis_if_needed, daemon=True)
+    t.start()
+
+
 # ========== SCHEDULER ==========
 scheduler = BackgroundScheduler(timezone="Europe/Zurich")
-scheduler.add_job(job_analyse_quotidienne, CronTrigger(hour=0, minute=0),
+scheduler.add_job(job_analyse_quotidienne, CronTrigger(hour=23, minute=58),
                   id="analyse_quotidienne", replace_existing=True, misfire_grace_time=3600)
 scheduler.add_job(job_refresh_cotes, IntervalTrigger(minutes=30),
                   id="refresh_cotes", replace_existing=True, misfire_grace_time=600)
-scheduler.add_job(job_verifier_resultats, IntervalTrigger(hours=1),
-                  id="verification_resultats", replace_existing=True, misfire_grace_time=1800)
+scheduler.add_job(job_verifier_resultats, CronTrigger(hour=4, minute=0),
+                  id="verification_resultats", replace_existing=True, misfire_grace_time=3600)
 
 if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
     scheduler.start()
