@@ -1,37 +1,46 @@
-name: Night Window + Evening Refresh
+name: Multi-window (17h, 20h, 22h30, 23h55, 04h05)
 
 on:
   schedule:
-    # Réveil nuit (23h55 UTC = 00h55 local)
-    - cron: '55 23 * * *'
-    # Ping fin de nuit (04h05 UTC)
-    - cron: '5 4 * * *'
-    # Réveil soir (17h UTC = 18h local)
+    # 17h UTC - 1er snapshot cotes du soir
     - cron: '0 17 * * *'
+    # 20h UTC - 2e snapshot (détection mouvement)
+    - cron: '0 20 * * *'
+    # 22h30 UTC - 3e snapshot (cotes finales)
+    - cron: '30 22 * * *'
+    # 23h55 UTC - réveil nuit
+    - cron: '55 23 * * *'
+    # 04h05 UTC - fin de nuit
+    - cron: '5 4 * * *'
   workflow_dispatch:
 
 jobs:
-  night-window:
-    if: github.event.schedule == '55 23 * * *' || github.event.schedule == '5 4 * * *'
+  wake-and-refresh:
+    if: |
+      github.event.schedule == '0 17 * * *' ||
+      github.event.schedule == '0 20 * * *' ||
+      github.event.schedule == '30 22 * * *'
     runs-on: ubuntu-latest
     steps:
-      - name: Ping nuit
+      - name: Wake + refresh cotes
+        run: |
+          echo "🌆 Réveil pour snapshot cotes"
+          curl -s -o /dev/null -w "Wake : HTTP %{http_code}\n" \
+            https://kenny-football.onrender.com/api/health
+          sleep 10
+          curl -s -X POST -o /dev/null -w "Refresh : HTTP %{http_code}\n" \
+            https://kenny-football.onrender.com/api/cron/trigger/refresh
+
+  night-window:
+    if: |
+      github.event.schedule == '55 23 * * *' ||
+      github.event.schedule == '5 4 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping nuit (23h55-04h05)
         run: |
           for i in $(seq 1 50); do
             curl -s -o /dev/null -w "Ping $i : HTTP %{http_code}\n" \
               https://kenny-football.onrender.com/api/health
             sleep 300
           done
-
-  evening-refresh:
-    if: github.event.schedule == '0 17 * * *'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Réveil soir + refresh cotes
-        run: |
-          echo "🌆 Réveil soir pour refresh cotes"
-          curl -s -o /dev/null -w "Wake : HTTP %{http_code}\n" \
-            https://kenny-football.onrender.com/api/health
-          sleep 10
-          curl -s -X POST -o /dev/null -w "Refresh : HTTP %{http_code}\n" \
-            https://kenny-football.onrender.com/api/cron/trigger/refresh
