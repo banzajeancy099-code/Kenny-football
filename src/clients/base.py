@@ -4,6 +4,7 @@ import hashlib
 import requests
 from typing import Optional
 from src.utils import log
+from src.clients import cache as disk_cache
 
 
 class BaseClient:
@@ -48,11 +49,18 @@ class BaseClient:
                 headers: Optional[dict] = None, max_retries: int = 3) -> dict:
         self._check_circuit()
 
+        # === 1. Cache disque (persistant) ===
+        disk_data = disk_cache.get(self.name, method, path, params)
+        if disk_data is not None:
+            log.debug(f"[{self.name}] disk cache HIT {path}")
+            return disk_data
+
+        # === 2. Cache mémoire (rapide) ===
         cache_key = self._cache_key(method, path, params or {})
         if cache_key in self._cache:
             cached_at, data = self._cache[cache_key]
             if time.time() - cached_at < self.cache_ttl_s:
-                log.debug(f"[{self.name}] cache HIT {path}")
+                log.debug(f"[{self.name}] mem cache HIT {path}")
                 return data
 
         url = f"{self.base_url}{path}"
@@ -74,7 +82,10 @@ class BaseClient:
                     continue
                 resp.raise_for_status()
                 data = resp.json()
+                # Cache mémoire
                 self._cache[cache_key] = (time.time(), data)
+                # Cache disque
+                disk_cache.set(self.name, method, path, params, data)
                 self._record_success()
                 return data
             except requests.exceptions.RequestException as e:
