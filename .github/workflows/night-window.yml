@@ -1,0 +1,31 @@
+name: Night Window (23h55-04h05)
+
+on:
+  schedule:
+    # Réveille le service à 23h55 UTC
+    - cron: '55 23 * * *'
+    # Dernier ping à 04h05 UTC (pour couvrir le job de 04h)
+    - cron: '5 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  wake-up:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake Render
+        run: |
+          echo "🕛 Réveil de Kenny Football"
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+            https://kenny-football.onrender.com/api/health
+
+  keep-awake:
+    runs-on: ubuntu-latest
+    needs: wake-up
+    steps:
+      - name: Ping toutes les 5 min pendant 4h10
+        run: |
+          for i in $(seq 1 50); do
+            curl -s -o /dev/null -w "Ping $i : HTTP %{http_code}\n" \
+              https://kenny-football.onrender.com/api/health
+            sleep 300  # 5 min
+          done
