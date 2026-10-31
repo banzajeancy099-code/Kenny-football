@@ -2,7 +2,7 @@ name: Night Window (23h55-04h05)
 
 on:
   schedule:
-    - cron: '55 23 * * *'
+    - cron: '55 22 * * *'  # 22h55 UTC = 23h55 local
     - cron: '5 4 * * *'
   workflow_dispatch:
 
