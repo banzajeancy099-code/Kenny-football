@@ -1,5 +1,19 @@
 # src/layers/l14_xg.py — Couche 14 : Expected Goals (xG)
-from datetime import datetime
+"""
+Analyse les expected goals RÉELS (xgf, xga) depuis get_standings.
+
+Signaux détectés :
+  1. Total xG attendu (xgf_home + xgf_away + xga_home + xga_away)
+  2. Sur-performance offensive (buts réels >> xG) → régression probable
+  3. Sous-performance offensive (buts réels << xG) → rebond probable
+  4. Sur-performance défensive (encaissés << xGA) → régression probable
+  5. Sous-performance défensive (encaissés >> xGA) → rebond probable
+
+Score final :
+  - xG total élevé → score > 5 (Over probable)
+  - xG total faible → score < 5 (Under probable)
+  - Ajustements selon les sur/sous-performances
+"""
 from src.layers.base import BaseLayer, LayerResult
 
 
@@ -9,113 +23,153 @@ class XGLayer(BaseLayer):
 
     def __init__(self, bzzoiro):
         self.bzzoiro = bzzoiro
+        self._standings_cache = {}
 
-    def _get_form(self, team_id):
-        if not team_id:
-            return None
+    def _get_standings_cached(self, league_id):
+        if not league_id:
+            return []
+        if league_id in self._standings_cache:
+            return self._standings_cache[league_id]
         try:
-            return self.bzzoiro.request("GET", f"/teams/{team_id}/form/")
+            standings = self.bzzoiro.get_standings(league_id) or []
         except Exception:
+            standings = []
+        self._standings_cache[league_id] = standings
+        return standings
+
+    def _get_team_xg(self, team_id, league_id):
+        """Retourne les vrais xG d'une équipe depuis get_standings."""
+        if not team_id or not league_id:
             return None
 
-    def _compute_xg(self, form):
-        """Calcule un xG estimé par match pour une équipe.
+        for t in self._get_standings_cached(league_id):
+            if t.get("team_id") == team_id:
+                played = t.get("played", 0) or 0
+                xg_games = t.get("xg_games", 0) or 0
 
-        Basé sur :
-        - big_chances (occasions nettes)
-        - attack (efficacité offensive)
-        - big_chances_scored (buts sur occasions nettes)
-        """
-        if not form:
-            return None
-        overall = form.get("overall") or {}
-        matches = overall.get("matches") or 0
-        if matches < 3:
-            return None
+                # Vérifier qu'on a assez de matchs avec xG
+                if xg_games < 5:
+                    return None
 
-        stats = overall.get("stats") or {}
-
-        # Big chances (occasions nettes) par match
-        big_chances = stats.get("big_chances", {}).get("average", 0) or 0
-        big_chances_scored = stats.get("big_chances_scored", {}).get("average", 0) or 0
-
-        # Attack rating (0-100)
-        attack = stats.get("attack", {}).get("average", 0) or 0
-
-        # Buts réels par match
-        gf_avg = (overall.get("goals_for") or 0) / matches
-
-        # xG estimé : moyenne pondérée de plusieurs indicateurs
-        # big_chances × 0.35 (chaque grosse occasion vaut ~0.35 xG)
-        xg_from_chances = big_chances * 0.35
-        # attack rating normalisé (75 = moyenne, xG implicite ~1.2)
-        xg_from_attack = (attack / 75) * 1.2 if attack > 0 else 0
-        # buts réels (proxy)
-        xg_from_goals = gf_avg * 0.8
-
-        # Moyenne des 3 (avec pondération)
-        xg_est = (xg_from_chances * 0.5) + (xg_from_attack * 0.2) + (xg_from_goals * 0.3)
-
-        return {
-            "xg": round(xg_est, 2),
-            "big_chances": big_chances,
-            "big_chances_scored": big_chances_scored,
-            "attack": attack,
-            "gf_avg": round(gf_avg, 2),
-            "matches": matches,
-        }
+                return {
+                    "team_name": t.get("team_name", "?"),
+                    "played": played,
+                    "xg_games": xg_games,
+                    "xgf_total": t.get("xgf", 0) or 0,
+                    "xga_total": t.get("xga", 0) or 0,
+                    "gf_total": t.get("gf", 0) or 0,
+                    "ga_total": t.get("ga", 0) or 0,
+                    # Moyennes par match
+                    "xgf_avg": (t.get("xgf", 0) or 0) / xg_games if xg_games else 0,
+                    "xga_avg": (t.get("xga", 0) or 0) / xg_games if xg_games else 0,
+                    "gf_avg": (t.get("gf", 0) or 0) / played if played else 0,
+                    "ga_avg": (t.get("ga", 0) or 0) / played if played else 0,
+                    # Écarts (buts réels - xG)
+                    "attack_overperf": ((t.get("gf", 0) or 0) - (t.get("xgf", 0) or 0)) / xg_games if xg_games else 0,
+                    "defense_overperf": ((t.get("ga", 0) or 0) - (t.get("xga", 0) or 0)) / xg_games if xg_games else 0,
+                }
+        return None
 
     def compute(self, match, context):
         home_id = match.get("home_team_id")
         away_id = match.get("away_team_id")
+        league_id = match.get("league_id")
 
-        if not home_id or not away_id:
+        if not home_id or not away_id or not league_id:
             return LayerResult(
                 layer_id=self.id, layer_name=self.name,
                 score=5.0, confidence=0.0,
-                warnings=["team_id manquant"],
+                warnings=["team_id ou league_id manquant"],
             )
 
-        home_form = self._get_form(home_id)
-        away_form = self._get_form(away_id)
+        home = self._get_team_xg(home_id, league_id)
+        away = self._get_team_xg(away_id, league_id)
 
-        home_xg = self._compute_xg(home_form)
-        away_xg = self._compute_xg(away_form)
-
-        if home_xg is None or away_xg is None:
+        if home is None or away is None:
             return LayerResult(
                 layer_id=self.id, layer_name=self.name,
                 score=5.0, confidence=0.1,
                 warnings=["données xG indisponibles"],
             )
 
-        # Score Over 0-10 : plus le xG total est élevé, plus le match est ouvert
-        # xG total = home_xg + away_xg
-        # 0 → 0, 4.0+ → 10
-        total_xg = home_xg["xg"] + away_xg["xg"]
-        score = min(10.0, (total_xg / 4.0) * 10)
+        # === 1. xG total attendu ===
+        # xgf_home + xgf_away + xga_home + xga_away
+        total_xg = home["xgf_avg"] + away["xgf_avg"] + home["xga_avg"] + away["xga_avg"]
 
-        # Ajustement : si les 2 équipes ont un xG élevé, bonus
-        if home_xg["xg"] >= 1.5 and away_xg["xg"] >= 1.5:
-            score = min(10.0, score + 1.0)  # match très offensif
+        # === 2. Score de base : xG total → score 0-10 ===
+        # xG total 2.5 = neutre (score 5.0)
+        # xG total 4.0 = très offensif (score 9-10)
+        # xG total 1.5 = très fermé (score 1-2)
+        if total_xg >= 4.0:
+            score = 9.0 + min(1.0, (total_xg - 4.0) * 1.0)
+        elif total_xg >= 3.0:
+            score = 6.5 + (total_xg - 3.0) * 2.5
+        elif total_xg >= 2.5:
+            score = 5.5 + (total_xg - 2.5) * 2.0
+        elif total_xg >= 2.0:
+            score = 4.0 + (total_xg - 2.0) * 3.0
+        else:
+            score = max(0.0, total_xg * 2.0)
 
-        # Pénalité : si les 2 ont xG faible
-        if home_xg["xg"] <= 1.0 and away_xg["xg"] <= 1.0:
-            score = max(0.0, score - 1.0)
+        reasons = [f"xG total attendu: {total_xg:.2f}"]
+
+        # === 3. Ajustement attaque : sur-performance = régression ===
+        # attack_overperf > 0.3 → l'équipe marque plus que ses xG → régression probable
+        for label, team in (("home", home), ("away", away)):
+            overperf = team["attack_overperf"]
+            if overperf > 0.40:
+                score -= 0.5
+                reasons.append(f"{label} sur-perf attaque (+{overperf:.2f}/match) → régression")
+            elif overperf > 0.20:
+                score -= 0.25
+                reasons.append(f"{label} sur-perf attaque légère (+{overperf:.2f})")
+            elif overperf < -0.40:
+                score += 0.5
+                reasons.append(f"{label} sous-perf attaque ({overperf:.2f}/match) → rebond")
+            elif overperf < -0.20:
+                score += 0.25
+                reasons.append(f"{label} sous-perf attaque légère ({overperf:.2f})")
+
+        # === 4. Ajustement défense : sur-performance = régression ===
+        # defense_overperf < 0 → encaisse MOINS que xGA → chance → régression (plus de buts)
+        # defense_overperf > 0 → encaisse PLUS que xGA → malchance → rebond (moins de buts)
+        for label, team in (("home", home), ("away", away)):
+            overperf = team["defense_overperf"]
+            if overperf < -0.40:
+                score += 0.5
+                reasons.append(f"{label} défense sur-régime ({overperf:.2f}/match) → régression (plus de buts)")
+            elif overperf < -0.20:
+                score += 0.25
+                reasons.append(f"{label} défense sur-régime légère ({overperf:.2f})")
+            elif overperf > 0.40:
+                score -= 0.5
+                reasons.append(f"{label} défense sous-régime (+{overperf:.2f}/match) → rebond défensif")
+            elif overperf > 0.20:
+                score -= 0.25
+                reasons.append(f"{label} défense sous-régime légère (+{overperf:.2f})")
+
+        score = max(0.0, min(10.0, score))
+
+        # Confiance : haute si assez de matchs avec xG
+        confidence = 0.85 if (home["xg_games"] >= 10 and away["xg_games"] >= 10) else 0.6
 
         return LayerResult(
-            layer_id=self.id, layer_name=self.name,
+            layer_id=self.id,
+            layer_name=self.name,
             score=round(score, 2),
-            confidence=0.8,
+            confidence=confidence,
             raw={
-                "home_xg": home_xg,
-                "away_xg": away_xg,
+                "home": home,
+                "away": away,
                 "total_xg": round(total_xg, 2),
+                "reasons": reasons,
             },
             features={
-                "home_xg": home_xg["xg"],
-                "away_xg": away_xg["xg"],
                 "total_xg": round(total_xg, 2),
+                "home_xgf": round(home["xgf_avg"], 2),
+                "away_xgf": round(away["xgf_avg"], 2),
+                "home_attack_overperf": round(home["attack_overperf"], 2),
+                "away_attack_overperf": round(away["attack_overperf"], 2),
             },
-            warnings=[],
+            warnings=reasons if len(reasons) > 1 else [],
         )
