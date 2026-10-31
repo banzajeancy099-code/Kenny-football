@@ -1,28 +1,37 @@
-name: Night Window (23h55-04h05)
+name: Night Window + Evening Refresh
 
 on:
   schedule:
-    - cron: '55 22 * * *'  # 22h55 UTC = 23h55 local
+    # Réveil nuit (23h55 UTC = 00h55 local)
+    - cron: '55 23 * * *'
+    # Ping fin de nuit (04h05 UTC)
     - cron: '5 4 * * *'
+    # Réveil soir (17h UTC = 18h local)
+    - cron: '0 17 * * *'
   workflow_dispatch:
 
 jobs:
-  wake-up:
+  night-window:
+    if: github.event.schedule == '55 23 * * *' || github.event.schedule == '5 4 * * *'
     runs-on: ubuntu-latest
     steps:
-      - name: Wake Render
-        run: |
-          echo "🕛 Réveil de Kenny Football"
-          curl -s -o /dev/null -w "HTTP %{http_code}\n" \
-            https://kenny-football.onrender.com/api/health
-
-  keep-awake:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ping toutes les 5 min pendant 4h10
+      - name: Ping nuit
         run: |
           for i in $(seq 1 50); do
             curl -s -o /dev/null -w "Ping $i : HTTP %{http_code}\n" \
               https://kenny-football.onrender.com/api/health
             sleep 300
           done
+
+  evening-refresh:
+    if: github.event.schedule == '0 17 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Réveil soir + refresh cotes
+        run: |
+          echo "🌆 Réveil soir pour refresh cotes"
+          curl -s -o /dev/null -w "Wake : HTTP %{http_code}\n" \
+            https://kenny-football.onrender.com/api/health
+          sleep 10
+          curl -s -X POST -o /dev/null -w "Refresh : HTTP %{http_code}\n" \
+            https://kenny-football.onrender.com/api/cron/trigger/refresh
