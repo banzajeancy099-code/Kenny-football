@@ -24,6 +24,8 @@ from src.layers.l28_scorers import ScorersLayer
 from src.layers.l29_btts_history import BTTSHistoryLayer
 from src.layers.l31_negatives import NegativesLayer
 from src.layers.l32_btts_context import BTTSContextLayer
+from src.layers.l33_squad_depth import SquadDepthLayer
+from src.layers.l34_context_enjeu import ContextEnjeuLayer
 from src.scoring import BayesianScorer
 
 
@@ -66,13 +68,14 @@ def _get_league_stats(bzzoiro):
 
 log = logging.getLogger("orchestrator")
 
-TARGET_LEAGUES = {1, 4, 5, 6, 9, 10, 12, 14, 15, 18, 19, 54, 96}
+TARGET_LEAGUES = {1, 3, 4, 5, 6, 9, 10, 12, 14, 15, 18, 19, 34, 54, 85, 89, 96}
 
 LEAGUES = {
     1: "Premier League", 4: "Serie A", 5: "Bundesliga",
     6: "Ligue 1", 9: "Brasileirão", 10: "Eredivisie",
     12: "Championship", 14: "Pro League BE", 15: "Super League (CH)",
     18: "MLS", 19: "Liga MX", 54: "Eliteserien", 96: "Bundesliga AT",
+    3: "La Liga", 34: "Brasileirão B", 85: "Primera División ARG", 89: "Ligue 2",
 }
 
 
@@ -145,6 +148,8 @@ class MatchPipeline:
             PsychoLayer(bzzoiro),
             NegativesLayer(bzzoiro),
             BTTSContextLayer(bzzoiro),
+            SquadDepthLayer(bzzoiro),
+            ContextEnjeuLayer(bzzoiro),
         ]
         self.scorer = BayesianScorer(weights)
 
