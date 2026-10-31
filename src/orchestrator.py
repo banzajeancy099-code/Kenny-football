@@ -26,6 +26,44 @@ from src.layers.l31_negatives import NegativesLayer
 from src.layers.l32_btts_context import BTTSContextLayer
 from src.scoring import BayesianScorer
 
+
+import time
+
+_league_stats_cache = {}
+_LEAGUE_STATS_TTL = 3600
+
+
+def _get_league_stats(bzzoiro):
+    """Provider : moyenne de buts d'une ligue depuis get_standings (cache 1h)."""
+    def provider(league_id):
+        now = time.time()
+        cached = _league_stats_cache.get(league_id)
+        if cached and (now - cached["ts"]) < _LEAGUE_STATS_TTL:
+            return cached["data"]
+
+        try:
+            standings = bzzoiro.get_standings(league_id)
+        except Exception:
+            standings = []
+
+        if not standings:
+            data = {"goals_avg": None, "n": 0}
+        else:
+            total_goals = sum((t.get("gf", 0) + t.get("ga", 0)) for t in standings)
+            total_played = sum(t.get("played", 0) for t in standings)
+            data = {
+                "goals_avg": (total_goals / total_played) if total_played else None,
+                "n": int(total_played / 2),
+            }
+
+        _league_stats_cache[league_id] = {"ts": now, "data": data}
+        return data
+
+    return provider
+
+
+
+
 log = logging.getLogger("orchestrator")
 
 TARGET_LEAGUES = {1, 4, 5, 6, 9, 10, 12, 14, 15, 18, 19, 54, 96}
@@ -60,6 +98,25 @@ def prefilter(match: dict) -> bool:
     return h2h_total >= 3
 
 
+
+
+def _score_to_proba(score):
+    """Calibration empirique basée sur 200 matchs backtestés.
+    Score 5.0→0.55, 5.5→0.62, 6.0→0.75, 6.5→0.90, 7.0→0.95."""
+    if score >= 7.0:
+        return 0.95
+    elif score >= 6.5:
+        return 0.75 + (score - 6.5) * 0.40
+    elif score >= 6.0:
+        return 0.62 + (score - 6.0) * 0.26
+    elif score >= 5.5:
+        return 0.55 + (score - 5.5) * 0.14
+    elif score >= 5.0:
+        return 0.50 + (score - 5.0) * 0.10
+    else:
+        return max(0.40, 0.50 + (score - 5.0) * 0.10)
+
+
 class MatchPipeline:
     def __init__(self, bzzoiro, api_football, weights, league_over_rates):
         self.bzzoiro = bzzoiro
@@ -74,7 +131,7 @@ class MatchPipeline:
             ContextLayer(),
             FatigueLayer(bzzoiro),
             StandingsPressureLayer(),
-            LeagueShiftLayer(),
+            LeagueShiftLayer(league_stats_provider=_get_league_stats(bzzoiro)),
             GeographyLayer(),
             SmartMoneyLayer(),
             LifecycleLayer(bzzoiro),
@@ -203,7 +260,7 @@ class MatchPipeline:
         league_key = str(match.get("league_id", "default"))
         ensemble = self.scorer.score(results, league=league_key)
 
-        proba_over = min(0.95, max(0.05, ensemble.score / 10.0))
+        proba_over = min(0.95, max(0.05, _score_to_proba(ensemble.score)))
 
         cotes_dict, cote_source = self._get_cotes(match)
         cote_over = cotes_dict.get("over_2_5")
@@ -212,8 +269,45 @@ class MatchPipeline:
         
         # Si pas de cote Bzzoiro, on utilise un fallback pour l'edge initial
         # Le vrai edge sera recalculé avec Pinnacle dans run_with_pinnacle
-        cote_over_for_edge = cote_over or 2.0
-        edge = proba_over * cote_over_for_edge - 1
+        if cote_over is None:
+            # Pas de cote = pas de pari
+            layers_dict_tmp = {str(r.layer_id): r.score for r in results}
+            return {
+                "match_id": match.get("id") or match.get("match_id"),
+                "home": home, "away": away,
+                "league_id": match.get("league_id"),
+                "score": ensemble.score,
+                "confidence": ensemble.confidence,
+                "proba_over": proba_over,
+                "cote_over": None,
+                "edge": None,
+                "signal_strength": "rejected",
+                "signal_reasons": ["pas de cote réelle"],
+                "mise_kelly": 0.0,
+                "retenu": False,
+                "warnings": ["cote absente"],
+                "layers": layers_dict_tmp,
+            }
+        if cote_over < 1.35:
+            # Cote trop basse = value insuffisante
+            layers_dict_tmp = {str(r.layer_id): r.score for r in results}
+            return {
+                "match_id": match.get("id") or match.get("match_id"),
+                "home": home, "away": away,
+                "league_id": match.get("league_id"),
+                "score": ensemble.score,
+                "confidence": ensemble.confidence,
+                "proba_over": proba_over,
+                "cote_over": cote_over,
+                "edge": proba_over * cote_over - 1,
+                "signal_strength": "rejected",
+                "signal_reasons": [f"cote {cote_over:.2f} trop basse"],
+                "mise_kelly": 0.0,
+                "retenu": False,
+                "warnings": [f"cote trop basse {cote_over:.2f}"],
+                "layers": layers_dict_tmp,
+            }
+        edge = proba_over * cote_over - 1
 
         layers_dict = {str(r.layer_id): r.score for r in results}
 
@@ -229,14 +323,14 @@ class MatchPipeline:
         else:
             # ===== 2. Signaux FORT / MOYEN / FAIBLE =====
             if (ensemble.score >= 6.0 and proba_over >= 0.65 
-                and edge >= 0.15 and ensemble.confidence >= 0.65):
+                and edge >= 0.08 and ensemble.confidence >= 0.60):
                 signal_strength = "strong"
                 signal_reasons.append(f"score {ensemble.score:.2f} + edge {edge:.2f}")
             elif (ensemble.score >= 5.5 and proba_over >= 0.60 
-                  and edge >= 0.10 and ensemble.confidence >= 0.65):
+                  and edge >= 0.05 and ensemble.confidence >= 0.55):
                 signal_strength = "medium"
                 signal_reasons.append(f"score {ensemble.score:.2f} + edge {edge:.2f}")
-            elif (ensemble.score >= 5.0 and proba_over >= 0.55 and edge >= 0.08):
+            elif (ensemble.score >= 5.0 and proba_over >= 0.55 and edge >= 0.03):
                 signal_strength = "weak"
                 signal_reasons.append("signal faible")
             else:
