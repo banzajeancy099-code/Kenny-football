@@ -18,6 +18,7 @@ import yaml
 from src.clients.bzzoiro import BzzoiroClient
 from src.clients.api_football import APIFootballClient
 from src.orchestrator import MatchPipeline, prefilter
+from src.clients.pinnapi_client import PinnapiClient
 from src.db import init_db, save_predictions as db_save, load_predictions as db_load, get_archive
 
 # ========== LOGGER ==========
@@ -89,6 +90,7 @@ else:
     log.warning("⚠️  API-Football désactivé")
 
 init_db()  # Crée les tables Neon
+pinnapi_client = PinnapiClient()
 
 pipeline = MatchPipeline(
     bzzoiro=bzzoiro,
@@ -154,9 +156,10 @@ def _run_analysis_job(job_id, matches):
 
         for i, m in enumerate(matches):
             try:
-                result = pipeline.run(m)
+                result = pipeline.run_with_pinnacle(m, pinnapi_client)
                 mid = str(result.get("match_id") or m.get("id"))
                 data["matches"][mid] = result
+                log.info(f"[SAVE] {result.get('home')} · pinnacle_status={result.get('pinnacle_status')} · edge_pinnacle={result.get('edge_pinnacle')}")
                 if result.get("retenu") or (result.get("mise_kelly") or 0) > 0 or (result.get("mise_under") or 0) > 0:
                     with JOBS_LOCK:
                         ANALYSIS_JOBS[job_id]["retenus"] += 1
@@ -198,9 +201,10 @@ def job_analyse_quotidienne():
         log.error(f"❌ [CRON] Analyse échouée : {e}", exc_info=True)
 
 
-def job_refresh_cotes():
+def job_refresh_cotes(force=False):
+    """Refresh cotes Bzzoiro + Pinnacle toutes les 30 min (00h-03h)."""
     now = datetime.now()
-    if now.hour >= 3:
+    if not force and now.hour >= 3:
         return
     log.info(f"🔄 [CRON] Refresh cotes {now.strftime('%H:%M')}")
     try:
@@ -208,31 +212,128 @@ def job_refresh_cotes():
         data = load_predictions(today)
         if not data.get("matches"):
             return
+
         changed = 0
+        pinnacle_found = 0
+        pinnacle_rejected = 0
+        pinnacle_pending = 0
+
         for mid, pred in list(data["matches"].items()):
+            # 1. Refresh cote Bzzoiro
             try:
                 odds = bzzoiro.get_event_odds(mid)
                 new_cote = _extract_over_odd(odds)
-                if new_cote is None:
-                    continue
-                old_cote = pred.get("cote_over")
-                if old_cote and abs(new_cote - old_cote) / old_cote > 0.05:
-                    pred["cote_over"] = new_cote
-                    proba = pred.get("proba_over", 0)
-                    edge = proba * new_cote - 1
-                    pred["edge"] = round(edge, 3)
-                    mise = 0
-                    if edge >= 0.10 and pred.get("score", 0) >= 5.2:
-                        mise = min(round(1000 * edge * 0.05, 2), 30.0)
-                    pred["mise_kelly"] = mise
-                    if pred.get("score", 0) < 5.2:
-                        pred["retenu"] = False
-                    changed += 1
+                if new_cote is not None:
+                    old_cote = pred.get("cote_over")
+                    if old_cote and abs(new_cote - old_cote) / old_cote > 0.05:
+                        pred["cote_over"] = new_cote
+                        proba = pred.get("proba_over", 0)
+                        edge = proba * new_cote - 1
+                        pred["edge"] = round(edge, 3)
+                        mise = 0
+                        if edge >= 0.10 and pred.get("score", 0) >= 5.2:
+                            mise = min(round(1000 * edge * 0.10, 2), 30.0)
+                        pred["mise_kelly"] = mise
+                        changed += 1
             except Exception as e:
-                log.debug(f"[CRON] refresh {mid}: {e}")
+                log.debug(f"[CRON] refresh Bzzoiro {mid}: {e}")
+
+            # 2. Refresh cote Pinnacle (si retenu)
+            if pred.get("retenu") or (pred.get("mise_kelly", 0) > 0):
+                try:
+                    home = pred.get("home", "")
+                    away = pred.get("away", "")
+                    league_id = pred.get("league_id")
+                    pinnacle = pinnapi_client.find_fixture_odds(home, away, league_id=league_id)
+
+                    if pinnacle and pinnacle.get("over_2_5"):
+                        pinnacle_found += 1
+                        cote_pin = pinnacle["over_2_5"]
+                        proba = pred.get("proba_over", 0)
+                        edge_pin = proba * cote_pin - 1
+                        pred["cote_pinnacle_over"] = cote_pin
+                        pred["edge_pinnacle"] = round(edge_pin, 4)
+                        pred["pinnacle_status"] = "available"
+
+                        # Seuil Pinnacle adaptatif selon signal
+                        signal = pred.get("signal_strength", "medium")
+                        if signal == "strong":
+                            seuil_pin = 0.05
+                        elif signal == "medium":
+                            seuil_pin = 0.10
+                        else:
+                            seuil_pin = 0.15
+
+                        if edge_pin < seuil_pin:
+                            pred["retenu"] = False
+                            pred["mise_kelly"] = 0.0
+                            pred["pinnacle_status"] = "rejected"
+                            pred["warnings"].append(f"Pinnacle: edge {edge_pin:+.2%} < {seuil_pin:.0%}")
+                            pinnacle_rejected += 1
+                        else:
+                            if signal == "strong":
+                                mise = min(round(1000 * edge_pin * 0.15, 2), 50.0)
+                            elif signal == "medium":
+                                mise = min(round(1000 * edge_pin * 0.10, 2), 30.0)
+                            else:
+                                mise = min(round(1000 * edge_pin * 0.05, 2), 15.0)
+                            pred["mise_kelly"] = mise
+                    else:
+                        if pred.get("pinnacle_status") != "available":
+                            pred["pinnacle_status"] = "pending"
+                            pinnacle_pending += 1
+                            warnings = pred.get("warnings", [])
+                            if not any("Pinnacle: cote pas encore publi" in w for w in warnings):
+                                warnings.append("Pinnacle: cote pas encore publiée (en attente)")
+                                pred["warnings"] = warnings
+                except Exception as e:
+                    log.debug(f"[CRON] refresh Pinnacle {mid}: {e}")
+
+            # 3. Refresh score LIVE (si match en cours)
+            try:
+                event = bzzoiro.request("GET", f"/events/{mid}/")
+                ev_data = event.get("results") if isinstance(event, dict) and "results" in event else event
+                if isinstance(ev_data, list) and ev_data:
+                    ev_data = ev_data[0]
+                if isinstance(ev_data, dict):
+                    status = str(ev_data.get("status") or "").lower()
+                    if status in ("live", "1h", "2h", "ht", "et", "p"):
+                        pred["live_score"] = {
+                            "home": ev_data.get("home_score"),
+                            "away": ev_data.get("away_score"),
+                        }
+                        pred["live_minute"] = ev_data.get("current_minute")
+                        pred["live_status"] = "live"
+                    elif status == "notstarted":
+                        pred["live_status"] = "notstarted"
+                        pred["live_score"] = None
+                        pred["live_minute"] = None
+            except Exception as e:
+                log.debug(f"[CRON] refresh live {mid}: {e}")
+
+        # Cap FORCÉ avant save
+        for mid, pred in data["matches"].items():
+            signal = pred.get("signal_strength", "medium")
+            if signal == "strong":
+                cap = 50.0
+            elif signal == "medium":
+                cap = 30.0
+            elif signal == "weak":
+                cap = 15.0
+            else:
+                cap = 0.0
+            if pred.get("mise_kelly", 0) > cap:
+                pred["mise_kelly"] = cap
+            if pred.get("mise_btts", 0) > cap:
+                pred["mise_btts"] = cap
+            if signal == "rejected":
+                pred["mise_kelly"] = 0.0
+                pred["mise_btts"] = 0.0
+                pred["mise_under"] = 0.0
+
         data["last_update"] = now.isoformat()
         save_predictions(data, today)
-        log.info(f"✅ [CRON] Refresh : {changed} modifiés")
+        log.info(f"✅ [CRON] Refresh : {changed} Bzzoiro · {pinnacle_found} Pinnacle · {pinnacle_rejected} rejetés · {pinnacle_pending} en attente")
     except Exception as e:
         log.error(f"❌ [CRON] Refresh échoué : {e}", exc_info=True)
 
@@ -443,32 +544,95 @@ def analyze_sync():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route("/api/predictions")
-def predictions_today():
-    """Renvoie les prédictions ACTIVES (matchs pas encore terminés)."""
+@app.route("/api/live")
+def live_scores():
+    """Renvoie les scores live des matchs en cours (refresh 60s côté client)."""
     today = date.today()
     data = load_predictions(today)
     matches_dict = data.get("matches") or {}
     if not isinstance(matches_dict, dict):
         matches_dict = {}
-    matches = list(matches_dict.values())
 
-    now = datetime.now(timezone.utc)
-    active = []
-    for m in matches:
-        if not isinstance(m, dict):
+    live = []
+    for mid, pred in matches_dict.items():
+        if not isinstance(pred, dict):
             continue
-        if m.get("result"):
+        if pred.get("result"):
             continue
-        ko = m.get("kickoff")
-        if ko:
-            try:
-                ko_dt = datetime.fromisoformat(ko.replace("Z", "+00:00"))
-                if (now - ko_dt).total_seconds() > 2.5 * 3600:
-                    continue
-            except Exception:
-                pass
-        active.append(m)
+        status = pred.get("live_status")
+        if status == "live":
+            live.append({
+                "match_id": mid,
+                "home": pred.get("home"),
+                "away": pred.get("away"),
+                "home_score": pred.get("live_score", {}).get("home") if pred.get("live_score") else None,
+                "away_score": pred.get("live_score", {}).get("away") if pred.get("live_score") else None,
+                "minute": pred.get("live_minute"),
+            })
+
+    return jsonify({
+        "date": today.isoformat(),
+        "live_count": len(live),
+        "matches": live,
+    })
+
+
+@app.route("/api/predictions")
+def predictions_today():
+    """Renvoie les prédictions ACTIVES (matchs pas encore terminés = à venir + live)."""
+    today = date.today()
+    data = load_predictions(today)
+    matches_dict = data.get("matches") or {}
+    if not isinstance(matches_dict, dict):
+        matches_dict = {}
+
+    # Garde TOUS les matchs sans résultat (à venir + live)
+    active = [
+        m for m in matches_dict.values()
+        if isinstance(m, dict) and not m.get("result")
+    ]
+
+    # Cap FORCÉ des mises selon signal
+    for m in active:
+        signal = m.get("signal_strength", "medium")
+        if signal == "strong":
+            cap = 50.0
+        elif signal == "medium":
+            cap = 30.0
+        elif signal == "weak":
+            cap = 15.0
+        else:  # rejected
+            cap = 0.0
+        
+        if m.get("mise_kelly", 0) > cap:
+            m["mise_kelly"] = cap
+        if m.get("mise_btts", 0) > cap:
+            m["mise_btts"] = cap
+        if signal == "rejected":
+            m["mise_kelly"] = 0.0
+            m["mise_btts"] = 0.0
+            m["mise_under"] = 0.0
+
+    # Cap ULTIME à la lecture (quoi qu'il arrive)
+    for m in active:
+        signal = m.get("signal_strength", "medium")
+        if signal == "strong":
+            cap = 50.0
+        elif signal == "medium":
+            cap = 30.0
+        elif signal == "weak":
+            cap = 15.0
+        else:
+            cap = 0.0
+        
+        if (m.get("mise_kelly") or 0) > cap:
+            m["mise_kelly"] = cap
+        if (m.get("mise_btts") or 0) > cap:
+            m["mise_btts"] = cap
+        if signal == "rejected":
+            m["mise_kelly"] = 0.0
+            m["mise_btts"] = 0.0
+            m["mise_under"] = 0.0
 
     retenus_count = sum(
         1 for m in active
@@ -661,7 +825,7 @@ def cron_trigger(job_id):
         t.start()
         return jsonify({"success": True, "job": "analyse"})
     if job_id == "refresh":
-        job_refresh_cotes()
+        job_refresh_cotes(force=True)
         return jsonify({"success": True, "job": "refresh"})
     if job_id == "verif":
         d = request.args.get("date")

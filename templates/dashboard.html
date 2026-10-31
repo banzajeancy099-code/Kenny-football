@@ -295,7 +295,7 @@
         }
 
         return `
-            <div class="match-card bg-gray-800 rounded-xl p-4 border-l-4 ${accent} border border-gray-700 mb-3 ${retenu ? 'ring-1 ring-emerald-500/30' : ''}">
+            <div data-match-id="${m.match_id}" class="match-card bg-gray-800 rounded-xl p-4 border-l-4 ${accent} border border-gray-700 mb-3 ${retenu ? 'ring-1 ring-emerald-500/30' : ''}">
                 <div class="flex items-center justify-between mb-2">
                     <div class="league-title font-extrabold text-white uppercase tracking-tight">${league}</div>
                     <div class="flex items-center gap-1">
@@ -318,6 +318,10 @@
                     <div class="bg-gray-700/60 rounded-lg p-2 text-center">
                         <div class="text-gray-400 mb-0.5">Edge</div>
                         <div class="${data.edge > 0 ? 'text-emerald-400' : 'text-red-400'} font-bold text-sm">${Number(data.edge || 0).toFixed(2)}</div>
+                        ${m.edge_pinnacle !== undefined && m.edge_pinnacle !== null ? 
+                            `<div class="text-xs ${m.edge_pinnacle > 0 ? 'text-emerald-300' : 'text-red-300'} mt-0.5">P: ${Number(m.edge_pinnacle).toFixed(2)}</div>` :
+                            (m.pinnacle_status === 'pending' ? '<div class="text-xs text-yellow-400 mt-0.5">P: ⏳</div>' : '')
+                        }
                     </div>
                     <div class="bg-gray-700/60 rounded-lg p-2 text-center">
                         <div class="text-gray-400 mb-0.5">Cote</div>
@@ -328,6 +332,7 @@
                         <div class="${data.mise > 0 ? 'text-emerald-400' : 'text-gray-300'} font-bold text-sm">${Number(data.mise || 0).toFixed(2)}€</div>
                     </div>
                 </div>
+                ${liveScoreBlock}
                 ${verdictBlock}
             </div>`;
     }
@@ -537,12 +542,37 @@
         } catch (e) { console.error(e); }
     }
 
+    async function pollLive() {
+        try {
+            const data = await fetchJSON('/api/live');
+            if (data.live_count > 0) {
+                // Met à jour les cartes avec le score live
+                data.matches.forEach(liveMatch => {
+                    const cards = document.querySelectorAll(`[data-match-id="${liveMatch.match_id}"]`);
+                    cards.forEach(card => {
+                        const scoreEl = card.querySelector('.live-score');
+                        if (scoreEl) {
+                            scoreEl.textContent = `${liveMatch.home_score ?? '?'} - ${liveMatch.away_score ?? '?'}`;
+                        }
+                        const minuteEl = card.querySelector('.live-minute');
+                        if (minuteEl && liveMatch.minute) {
+                            minuteEl.textContent = `${liveMatch.minute}'`;
+                        }
+                    });
+                });
+            }
+        } catch (e) { console.error('pollLive:', e); }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         loadHome();
         loadMenu();
+        // Refresh complet toutes les 60s
         setInterval(() => {
             if (!document.getElementById('view-home').classList.contains('hidden')) loadHome();
         }, 60000);
+        // Poll live toutes les 30s
+        setInterval(pollLive, 30000);
     });
     </script>
 </body>

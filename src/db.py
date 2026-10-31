@@ -150,12 +150,16 @@ def save_predictions(d: date, data: dict):
                             proba_over, edge, cote_over, mise_kelly,
                             is_under_bet, proba_under, edge_under, mise_under,
                             score_btts, cote_btts_yes, edge_btts, mise_btts, retenu_btts,
-                            result, result_verdict, updated_at
+                            result, result_verdict,
+                            pinnacle_status, edge_pinnacle, cote_pinnacle_over,
+                            updated_at
                         ) VALUES (
                             %s, %s, %s, %s, %s, %s, %s, %s, %s,
                             %s, %s, %s, %s, %s, %s, %s, %s,
                             %s, %s, %s, %s, %s,
-                            %s, %s, NOW()
+                            %s, %s,
+                            %s, %s, %s,
+                            NOW()
                         )
                         ON CONFLICT (date, match_id) DO UPDATE SET
                             match_data = EXCLUDED.match_data,
@@ -175,6 +179,9 @@ def save_predictions(d: date, data: dict):
                             retenu_btts = EXCLUDED.retenu_btts,
                             result = EXCLUDED.result,
                             result_verdict = EXCLUDED.result_verdict,
+                            pinnacle_status = EXCLUDED.pinnacle_status,
+                            edge_pinnacle = EXCLUDED.edge_pinnacle,
+                            cote_pinnacle_over = EXCLUDED.cote_pinnacle_over,
                             updated_at = NOW()
                     """, (
                         d, mid, json.dumps(pred, default=str),
@@ -185,6 +192,9 @@ def save_predictions(d: date, data: dict):
                         pred.get("score_btts"), pred.get("cote_btts_yes"), pred.get("edge_btts"), pred.get("mise_btts"), pred.get("retenu_btts", False),
                         json.dumps(pred.get("result"), default=str) if pred.get("result") else None,
                         (pred.get("result") or {}).get("verdict") if pred.get("result") else None,
+                        pred.get("pinnacle_status"),
+                        pred.get("edge_pinnacle"),
+                        pred.get("cote_pinnacle_over"),
                     ))
             conn.commit()
             return True
@@ -221,6 +231,29 @@ def load_predictions(d: date):
                     data["result"] = result if isinstance(result, dict) else json.loads(result)
                 matches[match_id] = data
 
+            # Cap FORCÉ des mises selon signal
+            for mid, m in matches.items():
+                if not isinstance(m, dict):
+                    continue
+                signal = m.get("signal_strength", "medium")
+                if signal == "strong":
+                    cap = 50.0
+                elif signal == "medium":
+                    cap = 30.0
+                elif signal == "weak":
+                    cap = 15.0
+                else:  # rejected
+                    cap = 0.0
+                
+                if m.get("mise_kelly", 0) > cap:
+                    m["mise_kelly"] = cap
+                if m.get("mise_btts", 0) > cap:
+                    m["mise_btts"] = cap
+                if signal == "rejected":
+                    m["mise_kelly"] = 0.0
+                    m["mise_btts"] = 0.0
+                    m["mise_under"] = 0.0
+
             return {
                 "date": d.isoformat(),
                 "matches": matches,
@@ -249,6 +282,29 @@ def load_predictions(d: date):
                 if row["result"]:
                     data["result"] = row["result"] if isinstance(row["result"], dict) else json.loads(row["result"])
                 matches[row["match_id"]] = data
+
+            # Cap FORCÉ des mises selon signal
+            for mid, m in matches.items():
+                if not isinstance(m, dict):
+                    continue
+                signal = m.get("signal_strength", "medium")
+                if signal == "strong":
+                    cap = 50.0
+                elif signal == "medium":
+                    cap = 30.0
+                elif signal == "weak":
+                    cap = 15.0
+                else:  # rejected
+                    cap = 0.0
+                
+                if m.get("mise_kelly", 0) > cap:
+                    m["mise_kelly"] = cap
+                if m.get("mise_btts", 0) > cap:
+                    m["mise_btts"] = cap
+                if signal == "rejected":
+                    m["mise_kelly"] = 0.0
+                    m["mise_btts"] = 0.0
+                    m["mise_under"] = 0.0
 
             return {
                 "date": d.isoformat(),
