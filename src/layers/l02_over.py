@@ -1,29 +1,27 @@
-# src/layers/l02_over.py — Couche 2 : Over 2.5 (refonte dynamique v2)
-from src.layers.base import BaseLayer, LayerResult
+# src/layers/l02_over.py — Couche 2 : Over dynamique
+from src.layers.base import LayerResult
 
 
-class OverLayer(BaseLayer):
+class OverLayer:
+    """L2 : Taux Over dynamique basé sur les vrais buts de la ligue."""
     id = 2
     name = "Over 2.5"
 
-    def __init__(self, bzzoiro, league_over_rates=None):
+    def __init__(self, bzzoiro):
         self.bzzoiro = bzzoiro
-        self._standings_cache = {}
+        self._cache = {}
 
     def _get_standings_cached(self, league_id):
-        if not league_id:
-            return []
-        if league_id in self._standings_cache:
-            return self._standings_cache[league_id]
+        if league_id in self._cache:
+            return self._cache[league_id]
         try:
             standings = self.bzzoiro.get_standings(league_id) or []
         except Exception:
             standings = []
-        self._standings_cache[league_id] = standings
+        self._cache[league_id] = standings
         return standings
 
     def _compute_league_stats(self, league_id):
-        """Calcule les stats réelles de la ligue via get_standings."""
         standings = self._get_standings_cached(league_id)
         if not standings:
             return None
@@ -34,17 +32,13 @@ class OverLayer(BaseLayer):
             played = t.get("played", 0) or 0
             if played == 0:
                 continue
-            total_goals += (t.get("gf", 0) or 0)  # On compte UNE fois les buts marqués
+            total_goals += (t.get("gf", 0) or 0)
             total_matches += played
 
         if total_matches == 0:
             return None
 
-        # Buts par match = (total buts marqués / nombre de matchs-équipes) × 2
-        # Car chaque match a 2 équipes, et chaque but est compté 1x (gf)
         goals_per_match = (total_goals / total_matches) * 2
-
-        # Taux Over 2.5 estimé (moyenne 2.70 buts → ~55% Over)
         over_rate = min(0.95, max(0.30, (goals_per_match / 2.70) * 0.55))
 
         return {
@@ -64,7 +58,7 @@ class OverLayer(BaseLayer):
                 }
         return None
 
-    def compute(self, match, context):
+    def safe_compute(self, match, context=None):
         home_id = match.get("home_team_id")
         away_id = match.get("away_team_id")
         league_id = match.get("league_id")
@@ -94,17 +88,14 @@ class OverLayer(BaseLayer):
                 warnings=["stats équipes indisponibles"],
             )
 
-        # Score de base sur le taux Over de la ligue
-        # 0.55 = neutre (5.0), 0.75 = très offensif (8.0), 0.35 = très fermé (2.0)
+        # Score basé sur le taux Over de la ligue (amplifié × 15)
         base_score = 5.0 + (league["over_rate"] - 0.55) * 15.0
 
-        # Ajustement selon la confrontation des 2 équipes
-        # Moyenne de buts attendue par match (moyenne des attaques et défenses)
+        # Ajustement selon les équipes (xG attendu du match)
         home_attack = home["gf_avg"]
         away_attack = away["gf_avg"]
         home_defense = home["ga_avg"]
         away_defense = away["ga_avg"]
-        # Buts attendus par match (attaque domicile vs défense extérieur + inverse)
         expected_goals = (home_attack + away_defense) / 2 + (away_attack + home_defense) / 2
 
         if expected_goals > 3.5:
@@ -117,21 +108,17 @@ class OverLayer(BaseLayer):
             base_score -= 0.2
 
         score = max(0.0, min(10.0, base_score))
-        confidence = 0.8 if league["matches"] >= 50 else 0.5
 
         return LayerResult(
-            layer_id=self.id,
-            layer_name=self.name,
+            layer_id=self.id, layer_name=self.name,
             score=round(score, 2),
-            confidence=confidence,
+            confidence=0.8 if league["matches"] >= 50 else 0.5,
             raw={
                 "league_id": league_id,
                 "league_over_rate": league["over_rate"],
                 "league_goals_per_match": league["goals_per_match"],
                 "league_matches": league["matches"],
                 "expected_goals": round(expected_goals, 2),
-                "home_attack": round(home_attack, 2),
-                "away_attack": round(away_attack, 2),
             },
             features={
                 "league_over_rate": league["over_rate"],
@@ -139,3 +126,4 @@ class OverLayer(BaseLayer):
             },
             warnings=[],
         )
+

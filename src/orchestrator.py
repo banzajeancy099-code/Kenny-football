@@ -25,6 +25,9 @@ from src.layers.l29_btts_history import BTTSHistoryLayer
 from src.layers.l31_negatives import NegativesLayer
 from src.layers.l32_btts_context import BTTSContextLayer
 from src.layers.l33_squad_depth import SquadDepthLayer
+from src.layers.l35_red_flags import RedFlagsLayer
+from src.layers.l40_momentum_advanced import MomentumAdvancedLayer
+from src.layers.l42_split_performance import SplitPerformanceLayer
 from src.layers.l34_context_enjeu import ContextEnjeuLayer
 from src.scoring import BayesianScorer
 
@@ -153,6 +156,9 @@ class MatchPipeline:
             NegativesLayer(bzzoiro),
             BTTSContextLayer(bzzoiro),
             # SquadDepthLayer(bzzoiro),
+            RedFlagsLayer(bzzoiro),
+            MomentumAdvancedLayer(bzzoiro),
+            SplitPerformanceLayer(bzzoiro),
             ContextEnjeuLayer(bzzoiro),
         ]
         self.scorer = BayesianScorer(weights)
@@ -341,13 +347,17 @@ class MatchPipeline:
 
         # ===== 1. HARD REJECT : Signaux négatifs (L31) =====
         l31_score = layers_dict.get("31", 5.0)
+        l35_score = layers_dict.get("35", 5.0)
         signal_strength = "rejected"
         signal_reasons = []
         mise = 0.0
 
-        if l31_score < 3.0:
+        if l31_score < 3.0 or l35_score < 3.0:
             signal_strength = "rejected"
-            signal_reasons.append(f"L31={l31_score:.1f} (match à éviter)")
+            if l31_score < 3.0:
+                signal_reasons.append(f"L31={l31_score:.1f} (match à éviter)")
+            if l35_score < 3.0:
+                signal_reasons.append(f"L35={l35_score:.1f} (red flags)")
         else:
             # ===== 2. Signaux FORT / MOYEN / FAIBLE =====
             if (ensemble.score >= 6.0 and proba_over >= 0.65 
