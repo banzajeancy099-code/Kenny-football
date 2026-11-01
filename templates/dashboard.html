@@ -1,579 +1,444 @@
 <!DOCTYPE html>
-<html lang="fr" class="dark">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Kenny Football — Pronostics</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { padding-bottom: 90px; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
-        .tab-active { color: #10b981; }
-        .tab-active .tab-icon { transform: scale(1.15); }
-        .fade-in { animation: fadeIn .25s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-        .market-btn { transition: all .15s; }
-        .market-btn.active { background-color: #10b981; color: white; box-shadow: 0 0 0 2px #10b981; }
-        .count-btn { transition: all .15s; }
-        .count-btn.active { background-color: #10b981; color: white; }
-        .match-card { transition: transform .15s, box-shadow .15s; }
-        .match-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
-        .league-title { font-size: 1.15rem; letter-spacing: 0.02em; }
-        .pulse-live { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        @keyframes coteUp { 0% { color: #10b981; transform: scale(1.2); } 100% { color: #10b981; transform: scale(1); } }
-        @keyframes coteDown { 0% { color: #ef4444; transform: scale(1.2); } 100% { color: #ef4444; transform: scale(1); } }
-        .cote-up { color: #10b981; animation: coteUp 1.5s ease-out; }
-        .cote-down { color: #ef4444; animation: coteDown 1.5s ease-out; }
-    </style>
-</head>
-<body class="bg-gray-900 text-gray-100 min-h-screen">
-
-    <header class="bg-gray-800/95 backdrop-blur border-b border-gray-700 sticky top-0 z-30">
-        <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div>
-                <h1 class="text-xl font-bold text-white tracking-tight">⚽ Kenny Football</h1>
-                <p class="text-xs text-gray-400" id="scheduler-status">—</p>
-            </div>
-            <button id="btn-analyze" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition text-white text-sm font-bold px-4 py-2 rounded-lg shadow-lg">
-                <span id="btn-analyze-text">🔍 Analyser</span>
-            </button>
-        </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto p-4">
-
-        <section id="view-home" class="view fade-in">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h2 class="text-xl font-bold text-white">📅 Aujourd'hui</h2>
-                    <p class="text-xs text-gray-400" id="home-date">—</p>
-                </div>
-                <div id="home-stats-quick" class="text-right text-xs text-gray-400"></div>
-            </div>
-
-            <!-- Marchés -->
-            <div class="mb-5">
-                <div class="text-xs uppercase tracking-wider text-gray-500 mb-2 font-bold">Marché</div>
-                <div class="flex gap-2 overflow-x-auto pb-2">
-                    <button data-market="over" class="market-btn active bg-gray-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">📈 Over 2.5</button>
-                    <button data-market="under" class="market-btn bg-gray-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">📉 Under 2.5</button>
-                    <button data-market="btts" class="market-btn bg-gray-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">🎯 BTTS</button>
-                </div>
-            </div>
-
-            <!-- Boutons Retenus/Analysés/Rejetés -->
-            <div class="mb-5">
-                <div class="text-xs uppercase tracking-wider text-gray-500 mb-2 font-bold">Filtre</div>
-                <div class="grid grid-cols-3 gap-2">
-                    <button data-count="retenu" class="count-btn active bg-gray-700 px-4 py-3 rounded-lg text-sm font-bold text-center">
-                        <div class="text-2xl font-bold" id="count-retenu">0</div>
-                        <div class="text-xs text-gray-400">✅ Retenus</div>
-                    </button>
-                    <button data-count="analyse" class="count-btn bg-gray-700 px-4 py-3 rounded-lg text-sm font-bold text-center">
-                        <div class="text-2xl font-bold" id="count-analyse">0</div>
-                        <div class="text-xs text-gray-400">📊 Analysés</div>
-                    </button>
-                    <button data-count="rejete" class="count-btn bg-gray-700 px-4 py-3 rounded-lg text-sm font-bold text-center">
-                        <div class="text-2xl font-bold" id="count-rejete">0</div>
-                        <div class="text-xs text-gray-400">❌ Rejetés</div>
-                    </button>
-                </div>
-            </div>
-
-            <div id="home-status" class="text-gray-400 text-sm mb-4"></div>
-            <div id="home-results"></div>
-        </section>
-
-        <section id="view-history" class="view hidden fade-in">
-            <div class="mb-4">
-                <h2 class="text-xl font-bold text-white">📜 Historique</h2>
-                <p class="text-xs text-gray-400">Matchs terminés · vérification toutes les heures</p>
-            </div>
-            <div id="history-global-stats" class="grid grid-cols-3 gap-3 mb-5"></div>
-            <div id="history-list" class="space-y-2"></div>
-            <div class="mt-4">
-                <button onclick="verifierTous()" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-3 py-3 rounded-lg">
-                    🔄 Vérifier les résultats
-                </button>
-            </div>
-            <div id="history-detail" class="mt-6"></div>
-        </section>
-
-        <section id="view-subscription" class="view hidden fade-in">
-            <h2 class="text-xl font-bold text-white mb-4">💎 Abonnement</h2>
-            <div class="bg-gray-800 rounded-xl p-6 text-center border border-gray-700">
-                <p class="text-gray-400 mb-4">Formule Pro — 30 couches, alertes Telegram, Kelly illimité.</p>
-                <button class="bg-emerald-600 px-6 py-3 rounded-lg font-bold text-white">Bientôt disponible</button>
-                <p class="text-xs text-gray-500 mt-4">Version gratuite : 18 couches · 3 marchés · 18 ligues</p>
-            </div>
-        </section>
-
-        <section id="view-menu" class="view hidden fade-in">
-            <h2 class="text-xl font-bold text-white mb-4">☰ Menu</h2>
-            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-3 text-sm">
-                <div class="flex justify-between"><span class="text-gray-400">Version</span><span id="menu-version">—</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Couches actives</span><span id="menu-layers">—</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Scheduler</span><span id="menu-scheduler">—</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Jobs</span><span id="menu-jobs">—</span></div>
-                <hr class="border-gray-700">
-                <a href="/api/health" target="_blank" class="block text-emerald-400 hover:underline">→ /api/health</a>
-                <a href="/api/archive" target="_blank" class="block text-emerald-400 hover:underline">→ /api/archive</a>
-            </div>
-        </section>
-    </main>
-
-    <nav class="bottom-nav fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 z-40">
-        <div class="max-w-6xl mx-auto grid grid-cols-4">
-            <button data-tab="home" class="tab tab-active py-3 flex flex-col items-center text-xs font-bold transition">
-                <span class="tab-icon text-xl">🏠</span><span>Accueil</span>
-            </button>
-            <button data-tab="history" class="tab py-3 flex flex-col items-center text-xs font-bold text-gray-400 transition">
-                <span class="tab-icon text-xl">📜</span><span>Historique</span>
-            </button>
-            <button data-tab="subscription" class="tab py-3 flex flex-col items-center text-xs font-bold text-gray-400 transition">
-                <span class="tab-icon text-xl">💎</span><span>Abonnement</span>
-            </button>
-            <button data-tab="menu" class="tab py-3 flex flex-col items-center text-xs font-bold text-gray-400 transition">
-                <span class="tab-icon text-xl">☰</span><span>Menu</span>
-            </button>
-        </div>
-    </nav>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Kenny Football · Dashboard Pro</title>
+    <script src="https://cdn.tailwindcss.com/3.4.1"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
-    let currentMarket = 'over';
-    let currentFilter = 'retenu';
-    let previousCotes = {};
-    let allMatches = [];
-
-    async function fetchJSON(url, opts) {
-        const res = await fetch(url, opts);
-        const text = await res.text();
-        try { return JSON.parse(text); }
-        catch (e) {
-            console.error('Non-JSON:', url, text.slice(0, 200));
-            throw new Error('API HTML (erreur serveur)');
-        }
-    }
-
-    function switchTab(tab) {
-        document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-        document.getElementById('view-' + tab).classList.remove('hidden');
-        document.querySelectorAll('.tab').forEach(t => {
-            t.classList.remove('tab-active', 'text-emerald-400');
-            t.classList.add('text-gray-400');
-        });
-        const active = document.querySelector(`.tab[data-tab="${tab}"]`);
-        active.classList.remove('text-gray-400');
-        active.classList.add('tab-active');
-        if (tab === 'history') loadHistory();
-        if (tab === 'menu') loadMenu();
-    }
-    document.querySelectorAll('.tab').forEach(t => {
-        t.addEventListener('click', () => switchTab(t.dataset.tab));
-    });
-
-    document.querySelectorAll('[data-market]').forEach(b => {
-        b.addEventListener('click', () => {
-            document.querySelectorAll('[data-market]').forEach(x => x.classList.remove('active'));
-            b.classList.add('active');
-            currentMarket = b.dataset.market;
-            renderFilteredMatches();
-        });
-    });
-
-    document.querySelectorAll('[data-count]').forEach(b => {
-        b.addEventListener('click', () => {
-            document.querySelectorAll('[data-count]').forEach(x => x.classList.remove('active'));
-            b.classList.add('active');
-            currentFilter = b.dataset.count;
-            renderFilteredMatches();
-        });
-    });
-
-    function fmtTime(iso) {
-        if (!iso) return '';
-        try { return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
-    }
-    function fmtDate(iso) {
-        if (!iso) return '';
-        try { return new Date(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch { return iso; }
-    }
-
-    function isRetenu(m) {
-        return (m.mise_kelly || 0) > 0 || (m.mise_under || 0) > 0 || (m.mise_btts || 0) > 0;
-    }
-
-    function getMarketData(m) {
-        if (currentMarket === 'btts') {
-            return {
-                badge: 'bg-purple-600',
-                badgeText: '🎯 BTTS YES',
-                proba: ((m.proba_btts ?? 0.5) * 100).toFixed(0),
-                edge: m.edge_btts ?? 0,
-                cote: m.cote_btts_yes ?? '—',
-                mise: m.mise_btts ?? 0,
-                scoreAffiche: m.score_btts ?? 5,
-                coteKey: `${m.match_id}_btts`,
-            };
-        } else if (currentMarket === 'under') {
-            return {
-                badge: 'bg-blue-600',
-                badgeText: '📉 UNDER 2.5',
-                proba: ((m.proba_under ?? (1 - (m.proba_over ?? 0))) * 100).toFixed(0),
-                edge: m.edge_under ?? 0,
-                cote: m.cote_over ?? '—',
-                mise: m.mise_under ?? 0,
-                scoreAffiche: m.score ?? 5,
-                coteKey: `${m.match_id}_under`,
-            };
-        }
-        return {
-            badge: 'bg-emerald-600',
-            badgeText: '📈 OVER 2.5',
-            proba: ((m.proba_over ?? 0) * 100).toFixed(0),
-            edge: m.edge ?? 0,
-            cote: m.cote_over ?? '—',
-            mise: m.mise_kelly ?? 0,
-            scoreAffiche: m.score ?? 5,
-            coteKey: `${m.match_id}_over`,
-        };
-    }
-
-    function renderMatchCard(m) {
-        const data = getMarketData(m);
-        const retenu = isRetenu(m);
-        const accent = retenu ? 'border-l-emerald-500' : 'border-l-gray-600';
-        const kickoff = fmtTime(m.kickoff);
-
-        // Cote : détecter mouvement
-        const prev = previousCotes[data.coteKey];
-        const curr = parseFloat(data.cote);
-        let coteClass = 'text-white';
-        let coteArrow = '';
-        if (prev !== undefined && !isNaN(curr) && !isNaN(prev) && curr !== prev) {
-            if (curr < prev) {
-                coteClass = 'cote-up';
-                coteArrow = ' ↓';
-            } else {
-                coteClass = 'cote-down';
-                coteArrow = ' ↑';
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        bg: '#0a0a0a', card: '#111111', cardHover: '#161616',
+                        accent: '#4ade80', accentDim: '#22c55e',
+                        danger: '#ef4444', warning: '#f59e0b',
+                    },
+                    boxShadow: { glow: '0 0 24px rgba(74, 222, 128, 0.12)' },
+                }
             }
         }
-        previousCotes[data.coteKey] = curr;
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: #0a0a0a; color: #e5e5e5; overscroll-behavior: none; }
+        body::before {
+            content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 40px 40px; pointer-events: none; z-index: 0;
+        }
+        .content { position: relative; z-index: 1; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+        .card { background: #111111; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+        .pulse-dot { animation: pulse-dot 2s infinite; }
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+        .tab-active { color: #4ade80; }
+        .tab-active .tab-icon { filter: drop-shadow(0 0 8px rgba(74,222,128,0.4)); }
+        .header-sticky { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(10, 10, 10, 0.88); border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .btn-analyze { background: linear-gradient(135deg, #22c55e, #4ade80); color: #0a0a0a; font-weight: 700; transition: all 0.2s; box-shadow: 0 0 20px rgba(74, 222, 128, 0.25); }
+        .btn-analyze:hover { box-shadow: 0 0 32px rgba(74, 222, 128, 0.4); transform: translateY(-1px); }
+        .btn-analyze:active { transform: translateY(0); }
+        .match-row { padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
+        .match-row:hover { background: rgba(255,255,255,0.02); }
+        .match-row:first-child { border-top: none; }
+        .league-header { padding: 10px 16px; background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #a3a3a3; display: flex; justify-content: space-between; align-items: center; }
+        .league-header:first-child { border-top: none; }
+        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; border: 1px solid; }
+        .badge-strong { background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.3); }
+        .badge-medium { background: rgba(245,158,11,0.1); color: #fbbf24; border-color: rgba(245,158,11,0.3); }
+        .badge-weak { background: rgba(249,115,22,0.1); color: #fb923c; border-color: rgba(249,115,22,0.3); }
+        .badge-rejected { background: rgba(115,115,115,0.1); color: #a3a3a3; border-color: rgba(115,115,115,0.3); }
+        .badge-live { background: rgba(239,68,68,0.15); color: #f87171; border-color: rgba(239,68,68,0.35); }
+        .badge-soon { background: rgba(245,158,11,0.12); color: #fbbf24; border-color: rgba(245,158,11,0.3); }
+        .market-tab { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); transition: all 0.15s; }
+        .market-tab:hover:not(.market-active) { background: rgba(255,255,255,0.06); color: #e5e5e5; }
+        .market-active { background: rgba(74,222,128,0.12) !important; color: #4ade80 !important; border-color: rgba(74,222,128,0.3) !important; }
+        .score-tab { flex: 1; padding: 8px 0; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: #737373; transition: all 0.15s; cursor: pointer; }
+        .score-tab:hover:not(.score-active):not(.score-disabled) { background: rgba(255,255,255,0.06); color: #e5e5e5; }
+        .score-active { background: rgba(74,222,128,0.15) !important; color: #4ade80 !important; border-color: rgba(74,222,128,0.4) !important; box-shadow: 0 0 12px rgba(74,222,128,0.15); }
+        .score-disabled { opacity: 0.35; cursor: not-allowed; }
+        .score-disabled::after { content: ' 🚧'; font-size: 9px; }
+        .coming-soon { text-align: center; padding: 3rem 1rem; }
+        .coming-soon .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.6; }
+        .coming-soon .title { font-size: 1.1rem; font-weight: 700; color: #e5e5e5; margin-bottom: 0.5rem; }
+        .coming-soon .desc { font-size: 0.8rem; color: #737373; }
+        .score-row-enter { animation: slideDown 0.25s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-4px); max-height: 0; } to { opacity: 1; transform: translateY(0); max-height: 100px; } }
+    </style>
+</head>
+<body>
+    <div class="content min-h-screen pb-24">
 
-        // Source
-        const src = m.cote_source || '';
-        let coteBadge = '';
-        if (src.startsWith('estimated')) coteBadge = '<span class="text-yellow-500 text-xs">~</span>';
-        else if (src.startsWith('default')) coteBadge = '<span class="text-red-400 text-xs">⚠️</span>';
+        <!-- HEADER -->
+        <header class="header-sticky">
+            <div class="max-w-2xl mx-auto px-4 py-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-xl shadow-glow relative">
+                            ⚽
+                            <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent border-2 border-bg pulse-dot"></span>
+                        </div>
+                        <div>
+                            <h1 class="text-[15px] font-extrabold text-white tracking-tight leading-none">Kenny Football</h1>
+                            <div class="flex items-center gap-1.5 mt-1">
+                                <span class="w-1 h-1 rounded-full bg-accent"></span>
+                                <span class="text-[10px] text-neutral-400 font-medium tracking-wide">v2.0 · Scheduler actif</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="startAnalyze()" class="btn-analyze px-3.5 py-2 rounded-lg text-xs flex items-center gap-1.5">
+                        <span>🔍</span><span>Analyser</span>
+                    </button>
+                </div>
+            </div>
+        </header>
 
-        const league = m.league_name || `Ligue ${m.league_id}`;
+        <!-- BARRE MARCHÉS (row 1) -->
+        <div class="sticky top-[57px] z-30 border-b border-white/5" style="backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(10,10,10,0.92);">
+            <div class="max-w-2xl mx-auto px-4 pt-2 pb-1">
+                <div class="flex gap-1.5 overflow-x-auto" style="scrollbar-width: none;">
+                    <button data-market="all" class="market-tab market-active px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap">Tous</button>
+                    <button data-market="over" class="market-tab px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap text-neutral-500">Over</button>
+                    <button data-market="btts" class="market-tab px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap text-neutral-500">BTTS</button>
+                    <button data-market="under" class="market-tab px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap text-neutral-500">Under</button>
+                    <button data-market="1x2" class="market-tab px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap text-neutral-500">1X2</button>
+                </div>
+            </div>
+            <!-- SCORE BAR (row 2 - conditionnelle) -->
+            <div id="score-bar" class="hidden">
+                <div class="max-w-2xl mx-auto px-4 pt-2 pb-2 score-row-enter">
+                    <div class="flex gap-1.5">
+                        <div class="score-tab score-disabled" data-score="1.5">1.5</div>
+                        <div class="score-tab score-active" data-score="2.5">2.5</div>
+                        <div class="score-tab score-disabled" data-score="3.5">3.5</div>
+                        <div class="score-tab score-disabled" data-score="4.5">4.5</div>
+                        <div class="score-tab score-disabled" data-score="5.5">5.5</div>
+                        <div class="score-tab score-disabled" data-score="6.5">6.5</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        // Live badge
-        let liveBadge = '';
-        if (!m.result && m.kickoff) {
-            const ko = new Date(m.kickoff);
-            const now = new Date();
-            if (ko > now) liveBadge = '<span class="bg-yellow-600/80 text-white px-2 py-0.5 rounded text-xs ml-2">⏳ À venir</span>';
-            else if (now - ko < 2.5 * 3600 * 1000) liveBadge = '<span class="bg-red-600 text-white px-2 py-0.5 rounded text-xs ml-2 pulse-live">🔴 LIVE</span>';
+        <!-- MAIN -->
+        <main class="max-w-2xl mx-auto px-4 py-4">
+            <div id="tab-home" class="tab-content">
+                <div class="flex items-baseline justify-between mb-3">
+                    <h2 class="text-lg font-extrabold text-white tracking-tight" id="home-title">Aujourd'hui</h2>
+                    <span id="home-count" class="mono text-[10px] text-neutral-500 uppercase tracking-widest"></span>
+                </div>
+                <div id="home-content">
+                    <div class="card p-6 text-center text-neutral-500 text-sm fade-in">Chargement...</div>
+                </div>
+            </div>
+
+            <div id="tab-history" class="tab-content hidden">
+                <h2 class="text-lg font-extrabold text-white tracking-tight mb-3">Historique</h2>
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <div class="card p-3 text-center">
+                        <div class="mono text-2xl font-extrabold text-accent" id="stat-correct">0</div>
+                        <div class="text-[9px] text-neutral-500 uppercase tracking-widest mt-0.5">Corrects</div>
+                    </div>
+                    <div class="card p-3 text-center">
+                        <div class="mono text-2xl font-extrabold text-danger" id="stat-wrong">0</div>
+                        <div class="text-[9px] text-neutral-500 uppercase tracking-widest mt-0.5">Ratés</div>
+                    </div>
+                    <div class="card p-3 text-center">
+                        <div class="mono text-2xl font-extrabold text-white" id="stat-accuracy">—</div>
+                        <div class="text-[9px] text-neutral-500 uppercase tracking-widest mt-0.5">Précision</div>
+                    </div>
+                </div>
+                <button onclick="verifyResults()" class="w-full card p-3 mb-3 flex items-center justify-center gap-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition">
+                    🔄 Vérifier les résultats
+                </button>
+                <div id="history-content">
+                    <div class="card p-6 text-center text-neutral-500 text-sm">Chargement...</div>
+                </div>
+            </div>
+
+            <div id="tab-subscription" class="tab-content hidden">
+                <h2 class="text-lg font-extrabold text-white tracking-tight mb-3">Abonnement</h2>
+                <div class="card p-8 text-center">
+                    <div class="text-5xl mb-3">💎</div>
+                    <h3 class="text-lg font-bold text-white mb-1">Premium</h3>
+                    <p class="text-sm text-neutral-400 mb-4">Bientôt disponible</p>
+                    <button class="btn-analyze px-6 py-2.5 rounded-lg text-sm opacity-50 cursor-not-allowed">S'abonner</button>
+                </div>
+            </div>
+
+            <div id="tab-menu" class="tab-content hidden">
+                <h2 class="text-lg font-extrabold text-white tracking-tight mb-3">Menu</h2>
+                <div class="card divide-y divide-white/5">
+                    <a href="/api/health" target="_blank" class="flex items-center justify-between p-4 hover:bg-white/[0.02] transition">
+                        <span class="text-sm font-medium text-white">🩺 Santé du système</span><span class="text-neutral-500">→</span>
+                    </a>
+                    <a href="/api/cron/status" target="_blank" class="flex items-center justify-between p-4 hover:bg-white/[0.02] transition">
+                        <span class="text-sm font-medium text-white">⏰ Statut des jobs</span><span class="text-neutral-500">→</span>
+                    </a>
+                    <a href="/api/stats" target="_blank" class="flex items-center justify-between p-4 hover:bg-white/[0.02] transition">
+                        <span class="text-sm font-medium text-white">📊 Statistiques</span><span class="text-neutral-500">→</span>
+                    </a>
+                    <a href="https://github.com/banzajeancy099-code/Kenny-football" target="_blank" class="flex items-center justify-between p-4 hover:bg-white/[0.02] transition">
+                        <span class="text-sm font-medium text-white">📦 Code source</span><span class="text-neutral-500">→</span>
+                    </a>
+                </div>
+                <div class="card p-4 mt-3">
+                    <div class="text-[10px] text-neutral-500 uppercase tracking-widest mb-1">Version</div>
+                    <div class="mono text-sm text-white">Kenny Football v2.0</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- BOTTOM NAV -->
+        <nav class="fixed bottom-0 left-0 right-0 z-50" style="backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(10,10,10,0.95); border-top: 1px solid rgba(255,255,255,0.06);">
+            <div class="grid grid-cols-4 max-w-2xl mx-auto">
+                <button data-tab="home" class="tab tab-active py-2.5 flex flex-col items-center text-[10px] font-bold transition">
+                    <span class="tab-icon text-lg mb-0.5">🏠</span><span>Accueil</span>
+                </button>
+                <button data-tab="history" class="tab py-2.5 flex flex-col items-center text-[10px] font-bold text-neutral-500 transition">
+                    <span class="tab-icon text-lg mb-0.5">📜</span><span>Historique</span>
+                </button>
+                <button data-tab="subscription" class="tab py-2.5 flex flex-col items-center text-[10px] font-bold text-neutral-500 transition">
+                    <span class="tab-icon text-lg mb-0.5">💎</span><span>Abonnement</span>
+                </button>
+                <button data-tab="menu" class="tab py-2.5 flex flex-col items-center text-[10px] font-bold text-neutral-500 transition">
+                    <span class="tab-icon text-lg mb-0.5">☰</span><span>Menu</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        let currentMarket = 'all';
+        let currentScore = 2.5;
+
+        function switchMarket(market) {
+            currentMarket = market;
+            document.querySelectorAll('.market-tab').forEach(el => {
+                el.classList.remove('market-active');
+                el.classList.add('text-neutral-500');
+            });
+            const active = document.querySelector(`[data-market="${market}"]`);
+            if (active) { active.classList.add('market-active'); active.classList.remove('text-neutral-500'); }
+
+            const scoreBar = document.getElementById('score-bar');
+            if (market === 'over' || market === 'under') { scoreBar.classList.remove('hidden'); }
+            else { scoreBar.classList.add('hidden'); }
+
+            updateHomeTitle();
+            loadHome();
+        }
+        document.querySelectorAll('.market-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchMarket(tab.dataset.market));
+        });
+
+        function switchScore(score) {
+            const target = document.querySelector(`.score-tab[data-score="${score}"]`);
+            if (target && target.classList.contains('score-disabled')) return;
+            currentScore = parseFloat(score);
+            document.querySelectorAll('.score-tab').forEach(el => el.classList.remove('score-active'));
+            if (target) target.classList.add('score-active');
+            updateHomeTitle();
+            loadHome();
+        }
+        document.querySelectorAll('.score-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchScore(tab.dataset.score));
+        });
+
+        function updateHomeTitle() {
+            const el = document.getElementById('home-title');
+            if (currentMarket === 'over') el.textContent = `Over ${currentScore}`;
+            else if (currentMarket === 'under') el.textContent = `Under ${currentScore}`;
+            else {
+                const titles = { 'all': "Aujourd'hui", 'btts': 'BTTS', '1x2': '1X2' };
+                el.textContent = titles[currentMarket] || "Aujourd'hui";
+            }
         }
 
-        let verdictBlock = '';
-        if (m.result) {
-            const r = m.result;
-            const vColor = r.verdict === '✓' ? 'text-emerald-400' : 'text-red-400';
-            const vBg = r.verdict === '✓' ? 'bg-emerald-900/50' : 'bg-red-900/50';
-            verdictBlock = `
-                <div class="${vBg} border border-gray-700 rounded-lg p-3 mt-3 flex justify-between items-center">
-                    <div>
-                        <div class="text-xs text-gray-400">Score final</div>
-                        <div class="text-lg font-bold text-white">${r.home_score} - ${r.away_score} <span class="text-xs text-gray-400">(${r.total_goals} buts)</span></div>
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            document.querySelectorAll('.tab').forEach(el => {
+                el.classList.remove('tab-active');
+                el.classList.add('text-neutral-500');
+            });
+            const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
+            if (activeTab) { activeTab.classList.add('tab-active'); activeTab.classList.remove('text-neutral-500'); }
+            if (tabName === 'history') loadHistory();
+            if (tabName === 'home') loadHome();
+        }
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        });
+
+        function signalBadge(sig) {
+            const s = sig || 'rejected';
+            const icons = { strong: '🔥', medium: '⭐', weak: '🟡', rejected: '❌' };
+            const labels = { strong: 'STRONG', medium: 'MEDIUM', weak: 'WEAK', rejected: 'REJECTED' };
+            return `<span class="badge badge-${s}">${icons[s] || '?'} ${labels[s] || s.toUpperCase()}</span>`;
+        }
+        function fmtMoney(v) { return (v || 0).toFixed(2) + '€'; }
+        function edgeColor(v) { return v > 0 ? 'text-accent' : v < 0 ? 'text-danger' : 'text-neutral-400'; }
+
+        function renderMatchRow(m) {
+            const isWon = m.result_verdict === '✓';
+            const isLost = m.result_verdict === '×';
+            const probaPct = Math.round((m.proba_over || 0) * 100);
+            const edgePct = ((m.edge || 0) * 100);
+            const edgeStr = (edgePct >= 0 ? '+' : '') + edgePct.toFixed(2) + '%';
+            const kickoff = m.kickoff || '';
+            const isLive = m.status === 'live' || m.status === 'inprogress';
+            const isFuture = !m.result_verdict && !isLive;
+
+            let statusBadge = '';
+            if (isWon) statusBadge = '<span class="text-lg">✅</span>';
+            else if (isLost) statusBadge = '<span class="text-lg">❌</span>';
+            else if (isLive) statusBadge = '<span class="badge badge-live">● LIVE</span>';
+            else if (isFuture) statusBadge = '<span class="badge badge-soon">⏳ À venir</span>';
+
+            return `
+                <div class="match-row">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <div class="flex items-center gap-2 min-w-0">${signalBadge(m.signal_strength)} ${statusBadge}</div>
+                        <div class="flex items-center gap-2">
+                            <span class="mono text-[10px] text-neutral-500">${kickoff}</span>
+                            ${m.result_verdict ? `<span class="mono text-[10px] text-neutral-400">${m.result_home_score ?? '?'}-${m.result_away_score ?? '?'}</span>` : ''}
+                        </div>
                     </div>
-                    <div class="${vColor} text-4xl font-bold">${r.verdict}</div>
+                    <div class="flex items-baseline justify-between gap-3 mb-2">
+                        <div class="text-sm font-bold text-white truncate">${m.home} <span class="text-neutral-500 font-normal">vs</span> ${m.away}</div>
+                        <div class="text-right shrink-0">
+                            <div class="text-[9px] text-neutral-500 uppercase tracking-widest">Score</div>
+                            <div class="mono text-sm font-extrabold text-white">${(m.score || 0).toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1.5">
+                        <div class="text-center"><div class="text-[9px] text-neutral-500 uppercase tracking-widest">Proba</div><div class="mono text-xs font-bold text-white">${probaPct}%</div></div>
+                        <div class="text-center"><div class="text-[9px] text-neutral-500 uppercase tracking-widest">Edge</div><div class="mono text-xs font-bold ${edgeColor(edgePct)}">${edgeStr}</div></div>
+                        <div class="text-center"><div class="text-[9px] text-neutral-500 uppercase tracking-widest">Cote</div><div class="mono text-xs font-bold text-white">${(m.cote_over || 0).toFixed(2)}</div></div>
+                        <div class="text-center"><div class="text-[9px] text-neutral-500 uppercase tracking-widest">Mise</div><div class="mono text-xs font-bold text-accent">${fmtMoney(m.mise_kelly)}</div></div>
+                    </div>
                 </div>`;
         }
 
-        return `
-            <div data-match-id="${m.match_id}" class="match-card bg-gray-800 rounded-xl p-4 border-l-4 ${accent} border border-gray-700 mb-3 ${retenu ? 'ring-1 ring-emerald-500/30' : ''}">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="league-title font-extrabold text-white uppercase tracking-tight">${league}</div>
-                    <div class="flex items-center gap-1">
-                        ${kickoff ? `<span class="text-xs text-gray-400">${kickoff}</span>` : ''}
-                        ${liveBadge}
-                    </div>
-                </div>
-                <div class="text-base font-bold text-white mb-3">
-                    ${m.home || '?'} <span class="text-gray-500 font-normal">vs</span> ${m.away || '?'}
-                </div>
-                <div class="flex items-center justify-between mb-3">
-                    <span class="${data.badge} text-white px-3 py-1 rounded-full text-xs font-bold">${data.badgeText}</span>
-                    <span class="text-xs text-gray-400">Score <strong class="text-white">${Number(data.scoreAffiche).toFixed(2)}</strong></span>
-                </div>
-                <div class="grid grid-cols-4 gap-2 text-xs">
-                    <div class="bg-gray-700/60 rounded-lg p-2 text-center">
-                        <div class="text-gray-400 mb-0.5">Proba</div>
-                        <div class="text-white font-bold text-sm">${data.proba}%</div>
-                    </div>
-                    <div class="bg-gray-700/60 rounded-lg p-2 text-center">
-                        <div class="text-gray-400 mb-0.5">Edge</div>
-                        <div class="${data.edge > 0 ? 'text-emerald-400' : 'text-red-400'} font-bold text-sm">${Number(data.edge || 0).toFixed(2)}</div>
-                        ${m.edge_pinnacle !== undefined && m.edge_pinnacle !== null ? 
-                            `<div class="text-xs ${m.edge_pinnacle > 0 ? 'text-emerald-300' : 'text-red-300'} mt-0.5">P: ${Number(m.edge_pinnacle).toFixed(2)}</div>` :
-                            (m.pinnacle_status === 'pending' ? '<div class="text-xs text-yellow-400 mt-0.5">P: ⏳</div>' : '')
-                        }
-                    </div>
-                    <div class="bg-gray-700/60 rounded-lg p-2 text-center">
-                        <div class="text-gray-400 mb-0.5">Cote</div>
-                        <div class="${coteClass} font-bold text-sm">${data.cote}${coteArrow}${coteBadge}</div>
-                    </div>
-                    <div class="bg-gray-700/60 rounded-lg p-2 text-center">
-                        <div class="text-gray-400 mb-0.5">Mise</div>
-                        <div class="${data.mise > 0 ? 'text-emerald-400' : 'text-gray-300'} font-bold text-sm">${Number(data.mise || 0).toFixed(2)}€</div>
-                    </div>
-                </div>
-                ${liveScoreBlock}
-                ${verdictBlock}
-            </div>`;
-    }
-
-    function groupByLeague(matches) {
-        const groups = {};
-        matches.forEach(m => {
-            const key = m.league_name || `Ligue ${m.league_id}`;
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(m);
-        });
-        return groups;
-    }
-
-    async function loadHome() {
-        const status = document.getElementById('home-status');
-        const results = document.getElementById('home-results');
-        const quickStats = document.getElementById('home-stats-quick');
-        const dateEl = document.getElementById('home-date');
-
-        dateEl.textContent = fmtDate(new Date().toISOString().split('T')[0]);
-        status.textContent = '⏳ Chargement...';
-        results.innerHTML = '';
-
-        try {
-            const data = await fetchJSON('/api/predictions');
-            allMatches = data.matches || [];
-
-            if (allMatches.length === 0) {
-                status.innerHTML = `📭 Aucun match actif.<br><span class="text-xs text-gray-500">Clique sur 🔍 Analyser.</span>`;
-                document.getElementById('count-retenu').textContent = '0';
-                document.getElementById('count-analyse').textContent = '0';
-                document.getElementById('count-rejete').textContent = '0';
-                return;
-            }
-
-            const retenus = allMatches.filter(isRetenu);
-            const rejetes = allMatches.length - retenus.length;
-
-            document.getElementById('count-retenu').textContent = retenus.length;
-            document.getElementById('count-analyse').textContent = allMatches.length;
-            document.getElementById('count-rejete').textContent = rejetes;
-
-            status.textContent = `${allMatches.length} matchs · maj ${fmtTime(data.last_update)}`;
-            renderFilteredMatches();
-        } catch (e) {
-            status.textContent = '❌ ' + e.message;
-        }
-    }
-
-    function renderFilteredMatches() {
-        const results = document.getElementById('home-results');
-        let filtered = allMatches;
-
-        if (currentFilter === 'retenu') filtered = allMatches.filter(isRetenu);
-        else if (currentFilter === 'rejete') filtered = allMatches.filter(m => !isRetenu(m));
-
-        if (filtered.length === 0) {
-            results.innerHTML = `<div class="text-gray-500 text-sm text-center py-8">Aucun match dans cette catégorie</div>`;
-            return;
-        }
-
-        results.innerHTML = '';
-        const groups = groupByLeague(filtered);
-        Object.keys(groups).sort().forEach(league => {
-            const leagueMatches = groups[league];
-            const section = document.createElement('div');
-            section.className = 'mb-6';
-            section.innerHTML = `
-                <div class="flex items-center justify-between mb-2 px-1">
-                    <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wider">${league}</h3>
-                    <span class="text-xs text-gray-500">${leagueMatches.length} match${leagueMatches.length > 1 ? 's' : ''}</span>
-                </div>
-                <div>${leagueMatches.map(renderMatchCard).join('')}</div>`;
-            results.appendChild(section);
-        });
-    }
-
-    document.getElementById('btn-analyze').addEventListener('click', async () => {
-        const btn = document.getElementById('btn-analyze');
-        const txt = document.getElementById('btn-analyze-text');
-        const status = document.getElementById('home-status');
-        btn.disabled = true;
-        txt.textContent = '⏳ Démarrage...';
-        status.textContent = '🔍 Analyse en cours...';
-        try {
-            const data = await fetchJSON('/api/analyze/start?limit=200', { method: 'POST' });
-            if (!data.success) { status.textContent = '⚠️ ' + data.error; btn.disabled = false; txt.textContent = '🔍 Analyser'; return; }
-            status.textContent = `📊 ${data.total_bzzoiro} → ${data.filtered} analysables...`;
-            pollJob(data.job_id);
-        } catch (e) { status.textContent = '❌ ' + e.message; btn.disabled = false; txt.textContent = '🔍 Analyser'; }
-    });
-
-    async function pollJob(jobId) {
-        const btn = document.getElementById('btn-analyze');
-        const txt = document.getElementById('btn-analyze-text');
-        const status = document.getElementById('home-status');
-        while (true) {
-            try {
-                const j = await fetchJSON(`/api/analyze/status/${jobId}`);
-                if (j.status === 'running' || j.status === 'queued') {
-                    const done = j.done || 0, total = j.total || 0;
-                    txt.textContent = `⏳ ${done}/${total}`;
-                    status.textContent = `⚙️ ${done}/${total} · ${j.retenus || 0} retenus`;
-                } else if (j.status === 'done') {
-                    status.textContent = `✅ ${j.total} analysés`;
-                    break;
-                } else if (j.status === 'error') {
-                    status.textContent = '❌ ' + (j.error || 'Erreur');
-                    break;
-                }
-            } catch (e) { status.textContent = '❌ ' + e.message; break; }
-            await new Promise(r => setTimeout(r, 3000));
-        }
-        btn.disabled = false;
-        txt.textContent = '🔍 Analyser';
-        loadHome();
-    }
-
-    async function loadHistory() {
-        const list = document.getElementById('history-list');
-        const detail = document.getElementById('history-detail');
-        const gs = document.getElementById('history-global-stats');
-        list.innerHTML = '⏳ Chargement...';
-        detail.innerHTML = '';
-        gs.innerHTML = '';
-        try {
-            const data = await fetchJSON('/api/archive');
-            const items = data.archive || [];
-            if (items.length === 0) {
-                list.innerHTML = '<div class="text-gray-500 text-sm">Aucun match terminé pour l\'instant.</div>';
-                return;
-            }
-            const tc = items.reduce((s, i) => s + (i.correct || 0), 0);
-            const tw = items.reduce((s, i) => s + (i.wrong || 0), 0);
-            const acc = tc + tw > 0 ? (tc / (tc + tw)) : null;
-            if (acc !== null) {
-                gs.innerHTML = `
-                    <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
-                        <div class="text-2xl font-bold text-emerald-400">${tc}</div>
-                        <div class="text-xs text-gray-400">✓ Corrects</div>
-                    </div>
-                    <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
-                        <div class="text-2xl font-bold text-red-400">${tw}</div>
-                        <div class="text-xs text-gray-400">× Ratés</div>
-                    </div>
-                    <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
-                        <div class="text-2xl font-bold text-white">${(acc * 100).toFixed(1)}%</div>
-                        <div class="text-xs text-gray-400">Précision</div>
-                    </div>`;
-            }
-            list.innerHTML = items.map(it => {
-                const v = it.verified || 0, c = it.correct || 0, w = it.wrong || 0;
-                const badge = v > 0 ? `<span class="text-emerald-400">${c}✓</span> <span class="text-red-400">${w}×</span>` : `<span class="text-gray-500">—</span>`;
-                return `
-                    <button onclick="loadHistoryDetail('${it.date}')" class="w-full text-left bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-lg p-3 transition">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="font-bold text-white">${fmtDate(it.date)}</div>
-                                <div class="text-xs text-gray-500">${it.over_count || 0}📈 · ${it.under_count || 0}📉 · ${it.total} matchs</div>
-                            </div>
-                            <div class="text-right"><div class="text-sm font-bold">${badge}</div></div>
-                        </div>
-                    </button>`;
-            }).join('');
-        } catch (e) { list.innerHTML = '❌ ' + e.message; }
-    }
-
-    async function loadHistoryDetail(d) {
-        const detail = document.getElementById('history-detail');
-        detail.innerHTML = '⏳ Chargement...';
-        try {
-            const data = await fetchJSON('/api/predictions/' + d);
-            const matches = data.matches || [];
-            const finished = matches.filter(m => m.result);
-            let html = `<h3 class="text-md font-bold text-white mb-3">${fmtDate(d)} — ${finished.length} matchs terminés</h3>`;
-            const groups = groupByLeague(finished);
-            Object.keys(groups).sort().forEach(league => {
-                html += `<div class="mb-6"><h4 class="text-sm font-bold text-gray-300 uppercase tracking-wider mb-2">${league}</h4><div>${groups[league].map(renderMatchCard).join('')}</div></div>`;
+        function renderMatchesCard(matches) {
+            if (!matches || matches.length === 0) return `<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match</div>`;
+            const byLeague = {};
+            matches.forEach(m => {
+                const key = m.league_name || m.league_id || 'Autres';
+                if (!byLeague[key]) byLeague[key] = [];
+                byLeague[key].push(m);
             });
-            detail.innerHTML = html;
-            detail.scrollIntoView({ behavior: 'smooth' });
-        } catch (e) { detail.innerHTML = '❌ ' + e.message; }
-    }
-
-    async function verifierTous() {
-        const btn = event.target;
-        btn.disabled = true;
-        btn.textContent = '⏳...';
-        try {
-            await fetchJSON('/api/resultats/' + new Date().toISOString().split('T')[0], { method: 'POST' });
-            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-            await fetchJSON('/api/resultats/' + yesterday, { method: 'POST' });
-            loadHistory();
-        } catch (e) { alert('Erreur : ' + e.message); }
-        finally { btn.disabled = false; btn.textContent = '🔄 Vérifier les résultats'; }
-    }
-
-    async function loadMenu() {
-        try {
-            const [h, c] = await Promise.all([fetchJSON('/api/health'), fetchJSON('/api/cron/status')]);
-            document.getElementById('menu-version').textContent = h.version || '—';
-            document.getElementById('menu-layers').textContent = h.layers ?? '—';
-            document.getElementById('menu-scheduler').textContent = c.scheduler_running ? '✅ running' : '⏸ stopped';
-            document.getElementById('menu-jobs').textContent = (c.jobs || []).map(j => j.id).join(', ') || '—';
-            document.getElementById('scheduler-status').textContent = c.scheduler_running ? '⏰ Scheduler actif' : '⏸ Arrêté';
-        } catch (e) { console.error(e); }
-    }
-
-    async function pollLive() {
-        try {
-            const data = await fetchJSON('/api/live');
-            if (data.live_count > 0) {
-                // Met à jour les cartes avec le score live
-                data.matches.forEach(liveMatch => {
-                    const cards = document.querySelectorAll(`[data-match-id="${liveMatch.match_id}"]`);
-                    cards.forEach(card => {
-                        const scoreEl = card.querySelector('.live-score');
-                        if (scoreEl) {
-                            scoreEl.textContent = `${liveMatch.home_score ?? '?'} - ${liveMatch.away_score ?? '?'}`;
-                        }
-                        const minuteEl = card.querySelector('.live-minute');
-                        if (minuteEl && liveMatch.minute) {
-                            minuteEl.textContent = `${liveMatch.minute}'`;
-                        }
-                    });
-                });
+            let html = '<div class="card overflow-hidden fade-in">';
+            let first = true;
+            for (const [league, list] of Object.entries(byLeague)) {
+                html += `<div class="league-header" ${first ? 'style="border-top:none;"' : ''}>
+                    <span>${league}</span>
+                    <span class="mono text-[9px] text-neutral-500 normal-case tracking-normal font-medium">${list.length} match${list.length > 1 ? 's' : ''}</span>
+                </div>`;
+                first = false;
+                html += list.map(renderMatchRow).join('');
             }
-        } catch (e) { console.error('pollLive:', e); }
-    }
+            html += '</div>';
+            return html;
+        }
 
-    document.addEventListener('DOMContentLoaded', () => {
+        function renderComingSoon(marketName, desc) {
+            return `<div class="card fade-in">
+                <div class="coming-soon">
+                    <div class="icon">🚧</div>
+                    <div class="title">${marketName}</div>
+                    <div class="desc">${desc || 'Bientôt disponible'}</div>
+                </div>
+            </div>`;
+        }
+
+        async function loadHome() {
+            const el = document.getElementById('home-content');
+            document.getElementById('home-count').textContent = '';
+            if (currentMarket === '1x2') { el.innerHTML = renderComingSoon('1X2 (victoire/nul/défaite)'); return; }
+            if ((currentMarket === 'over' || currentMarket === 'under') && currentScore !== 2.5) {
+                el.innerHTML = renderComingSoon(`${currentMarket === 'over' ? 'Over' : 'Under'} ${currentScore}`, 'Le moteur ne calcule actuellement que le 2.5');
+                return;
+            }
+            try {
+                const r = await fetch('/api/predictions');
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                let matches = data.matches || data.predictions || [];
+                if (currentMarket === 'over') matches = matches.filter(m => (m.proba_over || 0) >= 0.5);
+                else if (currentMarket === 'under') matches = matches.filter(m => (m.proba_over || 0) < 0.5);
+                else if (currentMarket === 'btts') matches = matches.filter(m => (m.proba_btts || 0) >= 0.5);
+
+                document.getElementById('home-count').textContent = matches.length + ' match' + (matches.length > 1 ? 's' : '');
+                if (matches.length === 0) { el.innerHTML = `<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match pour ce marché</div>`; return; }
+                el.innerHTML = renderMatchesCard(matches);
+            } catch (e) {
+                el.innerHTML = `<div class="card p-6 text-center"><div class="text-4xl mb-2">📡</div><div class="text-sm text-neutral-400 font-medium">Serveur non joignable</div></div>`;
+            }
+        }
+
+        async function loadHistory() {
+            const el = document.getElementById('history-content');
+            try {
+                const r = await fetch('/api/archive');
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                const days = data.days || data.archive || [];
+                let totalCorrect = 0, totalWrong = 0;
+                days.forEach(d => { totalCorrect += d.correct || 0; totalWrong += d.wrong || 0; });
+                document.getElementById('stat-correct').textContent = totalCorrect;
+                document.getElementById('stat-wrong').textContent = totalWrong;
+                const total = totalCorrect + totalWrong;
+                document.getElementById('stat-accuracy').textContent = total > 0 ? Math.round((totalCorrect / total) * 100) + '%' : '—';
+                if (days.length === 0) { el.innerHTML = `<div class="card p-6 text-center text-neutral-500 text-sm">Aucun historique</div>`; return; }
+                let html = '';
+                days.forEach(d => {
+                    html += `<div class="mb-4">
+                        <div class="flex items-center justify-between mb-2 px-1">
+                            <div class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">${d.date || ''}</div>
+                            <div class="mono text-xs">
+                                <span class="text-accent font-bold">${d.correct || 0}✓</span>
+                                <span class="text-danger font-bold ml-2">${d.wrong || 0}×</span>
+                            </div>
+                        </div>
+                        ${renderMatchesCard(d.matches || [])}
+                    </div>`;
+                });
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = `<div class="card p-6 text-center"><div class="text-4xl mb-2">📡</div><div class="text-sm text-neutral-400 font-medium">Serveur non joignable</div></div>`;
+            }
+        }
+
+        async function startAnalyze() {
+            try {
+                const r = await fetch('/api/analyze/start', { method: 'POST' });
+                const data = await r.json();
+                if (data.success) setTimeout(loadHome, 3000);
+            } catch (e) { alert('Erreur: ' + e.message); }
+        }
+
+        async function verifyResults() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                await fetch('/api/resultats/' + today);
+                setTimeout(loadHistory, 2000);
+            } catch (e) { alert('Erreur: ' + e.message); }
+        }
+
         loadHome();
-        loadMenu();
-        // Refresh complet toutes les 60s
-        setInterval(() => {
-            if (!document.getElementById('view-home').classList.contains('hidden')) loadHome();
-        }, 60000);
-        // Poll live toutes les 30s
-        setInterval(pollLive, 30000);
-    });
     </script>
 </body>
 </html>
