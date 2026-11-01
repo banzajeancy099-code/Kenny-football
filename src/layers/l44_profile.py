@@ -1,4 +1,4 @@
-# src/layers/l44_profile.py — Couche 44 : Profil Offensif/Défensif
+# src/layers/l44_profile.py — Couche 44 : Profil Off/Déf V1
 from src.layers.base import LayerResult
 
 
