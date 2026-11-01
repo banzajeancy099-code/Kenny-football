@@ -29,6 +29,8 @@ from src.layers.l35_red_flags import RedFlagsLayer
 from src.layers.l40_momentum_advanced import MomentumAdvancedLayer
 from src.layers.l42_split_performance import SplitPerformanceLayer
 from src.layers.l44_profile import ProfileLayer
+from src.layers.l45_market_consensus import MarketConsensusLayer
+from src.layers.l46_under_market import UnderMarketLayer
 from src.layers.l34_context_enjeu import ContextEnjeuLayer
 from src.scoring import BayesianScorer
 
@@ -74,7 +76,7 @@ _BZZOIRO_SINGLETON = None
 
 log = logging.getLogger("orchestrator")
 
-TARGET_LEAGUES = {1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 14, 15, 18, 19, 26, 34, 38, 54, 84, 89, 94, 96, 100, 107, 108}
+TARGET_LEAGUES = {1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 14, 15, 17, 18, 19, 23, 25, 26, 34, 38, 52, 53, 54, 84, 89, 94, 96, 100, 107, 108}
 
 LEAGUES = {
     1: "Premier League", 4: "Serie A", 5: "Bundesliga",
@@ -88,6 +90,11 @@ LEAGUES = {
     100: "Serie B (ITA)",
     107: "Trendyol 1. Lig (TUR)",
     108: "Eerste Divisie",
+    17: "Saudi Pro League",
+    23: "Superliga (ROU)",
+    25: "Ekstraklasa",
+    52: "Chinese Super League",
+    53: "Botola Pro",
     2: "Liga Portugal",
     11: "Super Lig (TUR)",
     26: "Allsvenskan",
@@ -131,7 +138,13 @@ def prefilter(match: dict) -> bool:
                 odds_data = bz.get_event_odds(match_id)
                 odds = odds_data.get("odds", {}) if isinstance(odds_data, dict) else {}
                 cote_over = odds.get("over_25_goals")
-                if cote_over is None or cote_over < 1.35 or cote_over > 2.50:
+                cote_under = odds.get("under_25_goals")
+                
+                # Accepter le match si Over OU Under a une cote valide
+                over_valid = (cote_over is not None and 1.35 <= cote_over <= 2.50)
+                under_valid = (cote_under is not None and 1.50 <= cote_under <= 2.00)
+                
+                if not over_valid and not under_valid:
                     return False
         except Exception:
             # Si on ne peut pas récupérer la cote, on rejette le match
@@ -157,6 +170,21 @@ def _score_to_proba(score):
         return 0.50 + (score - 5.0) * 0.10
     else:
         return max(0.40, 0.50 + (score - 5.0) * 0.10)
+
+
+def _score_to_proba_under(score):
+    """Calibration Under basée sur 50 matchs réels.
+    Score 4.5→0.90, 5.0→0.80, 5.5→0.58, 6.0→0.41, 6.5→0.17."""
+    if score < 4.5:
+        return 0.90
+    elif score < 5.0:
+        return 0.80
+    elif score < 5.5:
+        return 0.58
+    elif score < 6.0:
+        return 0.41
+    else:
+        return 0.17
 
 
 class MatchPipeline:
@@ -194,6 +222,8 @@ class MatchPipeline:
             MomentumAdvancedLayer(bzzoiro),
             SplitPerformanceLayer(bzzoiro),
             ProfileLayer(bzzoiro),
+            MarketConsensusLayer(bzzoiro),
+            UnderMarketLayer(bzzoiro),
             ContextEnjeuLayer(bzzoiro),
         ]
         self.scorer = BayesianScorer(weights)
@@ -212,11 +242,13 @@ class MatchPipeline:
                 return {"over_2_5": 2.0, "btts_yes": None, "btts_no": None}, "default"
 
             over = odds.get("over_25_goals")
+            under = odds.get("under_25_goals")
             btts_yes = odds.get("btts_yes")
             btts_no = odds.get("btts_no")
 
             return {
                 "over_2_5": float(over) if over is not None and over > 1.01 else None,
+                "under_2_5": float(under) if under is not None and under > 1.01 else None,
                 "btts_yes": float(btts_yes) if btts_yes is not None and btts_yes > 1.01 else None,
                 "btts_no": float(btts_no) if btts_no is not None and btts_no > 1.01 else None,
             }, "api"
@@ -319,83 +351,41 @@ class MatchPipeline:
         
         # Si pas de cote Bzzoiro, on utilise un fallback pour l'edge initial
         # Le vrai edge sera recalculé avec Pinnacle dans run_with_pinnacle
-        if cote_over is None:
-            # Pas de cote = pas de pari
-            layers_dict_tmp = {str(r.layer_id): r.score for r in results}
-            return {
-                "match_id": match.get("id") or match.get("match_id"),
-                "home": home, "away": away,
-                "league_id": match.get("league_id"),
-                "score": ensemble.score,
-                "confidence": ensemble.confidence,
-                "proba_over": proba_over,
-                "cote_over": None,
-                "edge": None,
-                "signal_strength": "rejected",
-                "signal_reasons": ["pas de cote réelle"],
-                "mise_kelly": 0.0,
-                "retenu": False,
-                "warnings": ["cote absente"],
-                "layers": layers_dict_tmp,
-            }
-        if cote_over > 2.50:
-            # Cote trop élevée = marché sceptique
-            layers_dict_tmp = {str(r.layer_id): r.score for r in results}
-            return {
-                "match_id": match.get("id") or match.get("match_id"),
-                "home": home, "away": away,
-                "league_id": match.get("league_id"),
-                "score": ensemble.score,
-                "confidence": ensemble.confidence,
-                "proba_over": proba_over,
-                "cote_over": cote_over,
-                "edge": proba_over * cote_over - 1,
-                "signal_strength": "rejected",
-                "signal_reasons": [f"cote {cote_over:.2f} trop élevée"],
-                "mise_kelly": 0.0,
-                "retenu": False,
-                "warnings": [f"cote trop élevée {cote_over:.2f}"],
-                "layers": layers_dict_tmp,
-            }
-        if cote_over < 1.35:
-            # Cote trop basse = value insuffisante
-            layers_dict_tmp = {str(r.layer_id): r.score for r in results}
-            return {
-                "match_id": match.get("id") or match.get("match_id"),
-                "home": home, "away": away,
-                "league_id": match.get("league_id"),
-                "score": ensemble.score,
-                "confidence": ensemble.confidence,
-                "proba_over": proba_over,
-                "cote_over": cote_over,
-                "edge": proba_over * cote_over - 1,
-                "signal_strength": "rejected",
-                "signal_reasons": [f"cote {cote_over:.2f} trop basse"],
-                "mise_kelly": 0.0,
-                "retenu": False,
-                "warnings": [f"cote trop basse {cote_over:.2f}"],
-                "layers": layers_dict_tmp,
-            }
-        edge = proba_over * cote_over - 1
+        # Vérifier si Over est exploitable
+        over_valid = (cote_over is not None and 1.35 <= cote_over <= 2.50)
+        
+        # Calculer l'edge Over (seulement si cote valide)
+        edge = proba_over * cote_over - 1 if over_valid else None
+
+        # Si Over n'est pas valide, on continue pour évaluer Under
+        # (pas de return immédiat)
+        if not over_valid:
+            log.info(f"[OVER] {home} · cote invalide ({cote_over}) · évaluation Under")
 
         layers_dict = {str(r.layer_id): r.score for r in results}
 
         # ===== 1. HARD REJECT : Signaux négatifs (L31) =====
         l31_score = layers_dict.get("31", 5.0)
         l35_score = layers_dict.get("35", 5.0)
+        l45_score = layers_dict.get("45", 5.0)
         signal_strength = "rejected"
         signal_reasons = []
         mise = 0.0
 
-        if l31_score < 3.0 or l35_score < 3.0:
+        if l31_score < 3.0 or l35_score < 3.0 or l45_score < 3.0:
             signal_strength = "rejected"
             if l31_score < 3.0:
                 signal_reasons.append(f"L31={l31_score:.1f} (match à éviter)")
             if l35_score < 3.0:
                 signal_reasons.append(f"L35={l35_score:.1f} (red flags)")
+            if l45_score < 3.0:
+                signal_reasons.append(f"L45={l45_score:.1f} (contre le marché)")
         else:
             # ===== 2. Signaux FORT / MOYEN / FAIBLE =====
-            if (ensemble.score >= 6.0 and proba_over >= 0.65 
+            if edge is None:
+                signal_strength = "rejected"
+                signal_reasons.append("pas de cote Over valide")
+            elif (ensemble.score >= 6.0 and proba_over >= 0.65 
                 and edge >= 0.08 and ensemble.confidence >= 0.60):
                 signal_strength = "strong"
                 signal_reasons.append(f"score {ensemble.score:.2f} + edge {edge:.2f}")
@@ -477,7 +467,33 @@ class MatchPipeline:
         if cote_source.startswith("default"):
             warnings.append(f"cote par défaut 2.0 ({cote_source})")
 
-        log.info(f"[FINAL] {home} · signal={signal_strength} · mise={mise}€ · edge={edge:.2f}")
+        edge_str = f"{edge:.2f}" if edge is not None else "N/A"
+        log.info(f"[FINAL] {home} · signal={signal_strength} · mise={mise}€ · edge={edge_str}")
+
+        # ===== 5. UNDER 2.5 (stratégie validée) =====
+        cote_under = cotes_dict.get("under_2_5")
+        score_final_under = ensemble.score
+
+        is_under_bet = False
+        proba_under = None
+        edge_under = None
+        mise_under = 0.0
+
+        # Vérifier L46 (marché orienté Under ou pas)
+        l46_score = layers_dict.get("46", 5.0)
+        
+        if (cote_under is not None
+            and 1.50 <= cote_under <= 2.00
+            and score_final_under < 4.8
+            and l46_score >= 3.0):
+            proba_under = _score_to_proba_under(ensemble.score)
+            edge_under = proba_under * cote_under - 1
+            if edge_under >= 0.05:
+                is_under_bet = True
+                mise_under = min(1000 * edge_under * 0.05, 15.0)
+                log.info(f"[UNDER] {home} · bet=True · edge={edge_under:.2f} · mise={mise_under:.2f}€ · cote={cote_under} · L46={l46_score:.1f}")
+        elif cote_under is not None and l46_score < 3.0:
+            log.info(f"[UNDER] {home} · SKIP · L46={l46_score:.1f} (marché opposé)")
 
         return {
             "match_id": match.get("id") or match.get("event_id"),
@@ -499,13 +515,18 @@ class MatchPipeline:
             "cote_btts_no": cote_btts_no,
             "cote_source": cote_source,
             "proba_over": round(proba_over, 3),
-            "edge": round(edge, 3),
+            "edge": round(edge, 3) if edge is not None else None,
             "mise_kelly": mise,
             "score_btts": round(score_btts, 2),
             "proba_btts": round(proba_btts, 3),
             "edge_btts": round(edge_btts, 4) if edge_btts is not None else None,
             "mise_btts": mise_btts,
             "retenu_btts": retenu_btts,
+            "is_under_bet": is_under_bet,
+            "proba_under": proba_under,
+            "edge_under": edge_under,
+            "mise_under": mise_under,
+            "cote_under": cote_under,
             "layers": {str(r.layer_id): round(r.score, 2) for r in results},
             "warnings": warnings,
             "result": None,
