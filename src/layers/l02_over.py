@@ -7,9 +7,11 @@ class OverLayer:
     id = 2
     name = "Over 2.5"
 
-    def __init__(self, bzzoiro):
+    def __init__(self, bzzoiro, league_over_rates=None):
         self.bzzoiro = bzzoiro
         self._cache = {}
+        # league_over_rates est ignoré (ancien système figé)
+        # On utilise maintenant les vrais taux via get_standings
 
     def _get_standings_cached(self, league_id):
         if league_id in self._cache:
