@@ -21,6 +21,10 @@ LEAGUE_MAP = {
     18: "soccer_usa_mls",
     19: "soccer_mexico_ligamx",
     54: "soccer_norway_eliteserien",
+    3: "soccer_spain_la_liga",
+    34: "soccer_brazil_serie_b",
+    85: "soccer_argentina_primera_division",
+    89: "soccer_france_ligue_two",
     96: "soccer_austria_bundesliga",
 }
 

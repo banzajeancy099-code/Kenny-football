@@ -96,20 +96,18 @@ class XGLayer(BaseLayer):
         # xgf_home + xgf_away + xga_home + xga_away
         total_xg = home["xgf_avg"] + away["xgf_avg"] + home["xga_avg"] + away["xga_avg"]
 
-        # === 2. Score de base : xG total → score 0-10 ===
-        # xG total 2.5 = neutre (score 5.0)
-        # xG total 4.0 = très offensif (score 9-10)
-        # xG total 1.5 = très fermé (score 1-2)
-        if total_xg >= 4.0:
-            score = 9.0 + min(1.0, (total_xg - 4.0) * 1.0)
-        elif total_xg >= 3.0:
-            score = 6.5 + (total_xg - 3.0) * 2.5
-        elif total_xg >= 2.5:
-            score = 5.5 + (total_xg - 2.5) * 2.0
-        elif total_xg >= 2.0:
-            score = 4.0 + (total_xg - 2.0) * 3.0
-        else:
-            score = max(0.0, total_xg * 2.0)
+        # === 2. Score de base : normalisé par la moyenne de la ligue ===
+        # Moyenne xG par match en général : 2.5-2.8
+        # Un match à xG=2.7 est "neutre" (score 5.0)
+        # Un match à xG=4.8 dans une ligue à 2.8 est 1.71× → score 8.5
+        LEAGUE_AVG_XG = 2.70  # référence universelle (moyenne européenne)
+        ratio = total_xg / LEAGUE_AVG_XG
+
+        # Score = 5.0 + (ratio - 1) * 5.0, clampé 0-10
+        score = 5.0 + (ratio - 1.0) * 5.0
+
+        # Clamp final
+        score = max(0.0, min(10.0, score))
 
         reasons = [f"xG total attendu: {total_xg:.2f}"]
 

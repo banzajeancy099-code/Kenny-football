@@ -387,3 +387,65 @@ def get_archive(limit=90):
         except Exception as e:
             log.error(f"❌ Erreur get_archive: {e}")
             return []
+
+
+# ========== SNAPSHOTS DE COTES ==========
+def save_odds_snapshot(timestamp, sport_key, home, away, best_over_2_5, bookmaker, raw=None):
+    """Sauvegarde un snapshot de cote dans Neon."""
+    if not HAS_PSYCOPG2 or not DATABASE_URL:
+        return False
+
+    with get_conn() as conn:
+        if conn is None:
+            return False
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO odds_snapshots 
+                    (timestamp, sport_key, home, away, best_over_2_5, bookmaker, raw)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (timestamp, sport_key, home, away, best_over_2_5, bookmaker, json.dumps(raw) if raw else None))
+            conn.commit()
+            return True
+        except Exception as e:
+            log.error(f"❌ save_odds_snapshot: {e}")
+            conn.rollback()
+            return False
+
+
+def get_odds_history(home, away, limit=10):
+    """Récupère l'historique des cotes pour un match."""
+    if not HAS_PSYCOPG2 or not DATABASE_URL:
+        return []
+
+    with get_conn() as conn:
+        if conn is None:
+            return []
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT timestamp, best_over_2_5, bookmaker
+                    FROM odds_snapshots
+                    WHERE LOWER(home) = LOWER(%s) AND LOWER(away) = LOWER(%s)
+                    ORDER BY timestamp ASC
+                    LIMIT %s
+                """, (home, away, limit))
+                return cur.fetchall()
+        except Exception as e:
+            log.error(f"❌ get_odds_history: {e}")
+            return []
+
+
+def get_snapshot_count():
+    """Compte le nombre de snapshots en base."""
+    if not HAS_PSYCOPG2 or not DATABASE_URL:
+        return 0
+    with get_conn() as conn:
+        if conn is None:
+            return 0
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM odds_snapshots")
+                return cur.fetchone()[0]
+        except Exception:
+            return 0

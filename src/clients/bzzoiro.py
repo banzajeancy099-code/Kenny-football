@@ -45,4 +45,4 @@ class BzzoiroClient(BaseClient):
 
     def get_standings(self, league_id: int) -> list:
         data = self.get(f"/leagues/{league_id}/standings/")
-        return data.get("results", [])
+        return data.get("standings", [])

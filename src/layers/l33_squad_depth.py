@@ -325,6 +325,18 @@ class SquadDepthLayer(BaseLayer):
             score += 0.2
             reasons.append(f"effectifs de qualité (MV moyenne {avg_mv/1e6:.1f}M€)")
 
+        # 7. Déséquilibre de niveau (favorise Over : le favori va marquer)
+        home_mv = home["avg_market_value"]
+        away_mv = away["avg_market_value"]
+        if home_mv > 0 and away_mv > 0:
+            ratio_mv = max(home_mv, away_mv) / min(home_mv, away_mv)
+            if ratio_mv >= 5.0:
+                score += 0.5
+                reasons.append(f"déséquilibre énorme ({ratio_mv:.0f}×) → favori va marquer")
+            elif ratio_mv >= 2.5:
+                score += 0.3
+                reasons.append(f"déséquilibre modéré ({ratio_mv:.1f}×)")
+
         score = max(0.0, min(10.0, score))
 
         # Confiance : haute si lineups confirmés et données complètes

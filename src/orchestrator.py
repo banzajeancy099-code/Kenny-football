@@ -68,7 +68,7 @@ def _get_league_stats(bzzoiro):
 
 log = logging.getLogger("orchestrator")
 
-TARGET_LEAGUES = {1, 3, 4, 5, 6, 9, 10, 12, 14, 15, 18, 19, 34, 54, 85, 89, 96}
+TARGET_LEAGUES = {1, 3, 4, 5, 6, 9, 10, 12, 14, 15, 18, 19, 34, 54, 85, 89, 94, 96}
 
 LEAGUES = {
     1: "Premier League", 4: "Serie A", 5: "Bundesliga",
@@ -76,6 +76,7 @@ LEAGUES = {
     12: "Championship", 14: "Pro League BE", 15: "Super League (CH)",
     18: "MLS", 19: "Liga MX", 54: "Eliteserien", 96: "Bundesliga AT",
     3: "La Liga", 34: "Brasileirão B", 85: "Primera División ARG", 89: "Ligue 2",
+    94: "2. Bundesliga",
 }
 
 
@@ -291,6 +292,25 @@ class MatchPipeline:
                 "mise_kelly": 0.0,
                 "retenu": False,
                 "warnings": ["cote absente"],
+                "layers": layers_dict_tmp,
+            }
+        if cote_over > 1.90:
+            # Cote trop élevée = marché sceptique
+            layers_dict_tmp = {str(r.layer_id): r.score for r in results}
+            return {
+                "match_id": match.get("id") or match.get("match_id"),
+                "home": home, "away": away,
+                "league_id": match.get("league_id"),
+                "score": ensemble.score,
+                "confidence": ensemble.confidence,
+                "proba_over": proba_over,
+                "cote_over": cote_over,
+                "edge": proba_over * cote_over - 1,
+                "signal_strength": "rejected",
+                "signal_reasons": [f"cote {cote_over:.2f} trop élevée"],
+                "mise_kelly": 0.0,
+                "retenu": False,
+                "warnings": [f"cote trop élevée {cote_over:.2f}"],
                 "layers": layers_dict_tmp,
             }
         if cote_over < 1.35:

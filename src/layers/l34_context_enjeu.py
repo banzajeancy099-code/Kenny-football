@@ -102,20 +102,20 @@ class ContextEnjeuLayer(BaseLayer):
         reasons = []
         score = 5.0
 
-        # 1. Enjeu pour le titre (top 3)
-        if pos and pos <= 3:
-            if gap_leader is not None and gap_leader <= 5:
-                score += 0.7
+        # 1. Enjeu pour le titre (top 4)
+        if pos and pos <= 4:
+            if gap_leader is not None and gap_leader <= 8:
+                score += 0.9
                 reasons.append(f"{pos}e à {gap_leader} pts du titre → enjeu MAX")
             elif gap_leader is not None and gap_leader > 15:
                 score -= 0.5
                 reasons.append(f"{pos}e à {gap_leader} pts du titre → course terminée")
 
-        # 2. Enjeu pour la relégation (3 derniers)
-        if pos and len(self._get_standings_cached(league_id)) > 0:
+        # 2. Enjeu pour la relégation (4 derniers)
+        if pos:
             total = len(self._get_standings_cached(league_id))
-            if pos >= total - 3:
-                score += 0.8
+            if total > 0 and pos >= total - 3:
+                score += 1.0
                 reasons.append(f"{pos}e (zone relégation) → enjeu MAX")
 
         # 3. Milieu de tableau sans enjeu

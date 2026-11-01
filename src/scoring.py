@@ -24,7 +24,7 @@ class BayesianScorer:
         if not valid:
             return EnsembleResult(5.0, 0.0, 0.0, 5.0, 5.0, {}, ["no_valid_layers"])
 
-        w = np.array([self.weights.get(r.layer_id, 1.0) for r in valid])
+        w = np.array([self.weights.get(str(r.layer_id), 1.0) for r in valid])
         c = np.array([r.confidence for r in valid])
         s = np.array([r.score for r in valid])
         w_eff = w * c
