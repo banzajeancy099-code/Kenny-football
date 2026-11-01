@@ -495,6 +495,74 @@ class MatchPipeline:
         elif cote_under is not None and l46_score < 3.0:
             log.info(f"[UNDER] {home} · SKIP · L46={l46_score:.1f} (marché opposé)")
 
+        # === COLLECTE DES DÉTAILS (lineups + top joueurs + classement) ===
+        lineups = None
+        top_players = {}
+        home_position = None
+        away_position = None
+        weather_data = None
+        
+        try:
+            import time
+            match_id_for_details = match.get("id") or match.get("event_id")
+            if match_id_for_details:
+                # Lineups (1 requête)
+                lineups = self.bzzoiro.get_event_lineups(match_id_for_details)
+                
+                # Top 3 joueurs par équipe (6 requêtes)
+                for side in ("home", "away"):
+                    team_lineup = lineups.get("lineups", {}).get(side, {})
+                    players = team_lineup.get("players", [])
+                    offensive = [p for p in players if p.get("position") in ("F", "M")][:3]
+                    
+                    player_stats = []
+                    for p in offensive:
+                        pid = p.get("id")
+                        try:
+                            stats = self.bzzoiro.request("GET", f"/players/{pid}/stats/", params={"limit": 5})
+                            results_stats = stats.get("results", []) if isinstance(stats, dict) else []
+                            total_goals = sum(s.get("goals", 0) or 0 for s in results_stats)
+                            total_xg = sum(s.get("expected_goals", 0) or 0 for s in results_stats)
+                            total_assists = sum(s.get("goal_assist", 0) or 0 for s in results_stats)
+                            total_minutes = sum(s.get("minutes_played", 0) or 0 for s in results_stats)
+                            player_score = total_goals * 2 + total_xg * 1.5 + total_assists + (total_minutes / 90) * 0.5
+                            player_stats.append({
+                                "name": p.get("name", "?"),
+                                "position": p.get("position", "?"),
+                                "goals": total_goals,
+                                "xg": round(total_xg, 2),
+                                "assists": total_assists,
+                                "score": round(player_score, 2),
+                            })
+                        except Exception:
+                            pass
+                        time.sleep(0.15)
+                    
+                    player_stats.sort(key=lambda x: -x["score"])
+                    top_players[side] = player_stats[:3]
+                
+                # Classement (1 requête, cache)
+                league_id_for_details = match.get("league_id")
+                standings = []
+                try:
+                    standings = self.bzzoiro.get_standings(league_id_for_details) or []
+                except Exception:
+                    standings = []
+                
+                home_id_for_details = match.get("home_team_id")
+                away_id_for_details = match.get("away_team_id")
+                home_pos_data = next((t for t in standings if t.get("team_id") == home_id_for_details), None)
+                away_pos_data = next((t for t in standings if t.get("team_id") == away_id_for_details), None)
+                
+                if home_pos_data:
+                    home_position = {"position": home_pos_data.get("position"), "points": home_pos_data.get("pts")}
+                if away_pos_data:
+                    away_position = {"position": away_pos_data.get("position"), "points": away_pos_data.get("pts")}
+                
+                weather_data = match.get("weather", {})
+        except Exception as e:
+            log.warning(f"[DETAILS] {match.get('id')}: {e}")
+
         return {
             "match_id": match.get("id") or match.get("event_id"),
             "home": home,
@@ -530,4 +598,9 @@ class MatchPipeline:
             "layers": {str(r.layer_id): round(r.score, 2) for r in results},
             "warnings": warnings,
             "result": None,
+            "lineups": lineups,
+            "top_players": top_players,
+            "home_position": home_position,
+            "away_position": away_position,
+            "weather": weather_data,
         }

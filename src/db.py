@@ -152,6 +152,7 @@ def save_predictions(d: date, data: dict):
                             score_btts, cote_btts_yes, edge_btts, mise_btts, retenu_btts,
                             result, result_verdict,
                             pinnacle_status, edge_pinnacle, cote_pinnacle_over,
+                            lineups, top_players, home_position, away_position, weather,
                             updated_at
                         ) VALUES (
                             %s, %s, %s, %s, %s, %s, %s, %s, %s,
@@ -159,6 +160,7 @@ def save_predictions(d: date, data: dict):
                             %s, %s, %s, %s, %s,
                             %s, %s,
                             %s, %s, %s,
+                            %s, %s, %s, %s, %s,
                             NOW()
                         )
                         ON CONFLICT (date, match_id) DO UPDATE SET
@@ -182,6 +184,11 @@ def save_predictions(d: date, data: dict):
                             pinnacle_status = EXCLUDED.pinnacle_status,
                             edge_pinnacle = EXCLUDED.edge_pinnacle,
                             cote_pinnacle_over = EXCLUDED.cote_pinnacle_over,
+                            lineups = EXCLUDED.lineups,
+                            top_players = EXCLUDED.top_players,
+                            home_position = EXCLUDED.home_position,
+                            away_position = EXCLUDED.away_position,
+                            weather = EXCLUDED.weather,
                             updated_at = NOW()
                     """, (
                         d, mid, json.dumps(pred, default=str),
@@ -195,6 +202,11 @@ def save_predictions(d: date, data: dict):
                         pred.get("pinnacle_status"),
                         pred.get("edge_pinnacle"),
                         pred.get("cote_pinnacle_over"),
+                        json.dumps(pred.get("lineups"), default=str) if pred.get("lineups") else None,
+                        json.dumps(pred.get("top_players"), default=str) if pred.get("top_players") else None,
+                        json.dumps(pred.get("home_position"), default=str) if pred.get("home_position") else None,
+                        json.dumps(pred.get("away_position"), default=str) if pred.get("away_position") else None,
+                        json.dumps(pred.get("weather"), default=str) if pred.get("weather") else None,
                     ))
             conn.commit()
             return True
