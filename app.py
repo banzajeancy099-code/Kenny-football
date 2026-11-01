@@ -37,7 +37,7 @@ logging.basicConfig(
 log = logging.getLogger("kenny-football")
 
 # ========== FLASK ==========
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.jinja_env.auto_reload = True
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
@@ -88,6 +88,10 @@ if not BZZOIRO_KEY:
     log.error("❌ BZZOIRO_API_KEY manquante")
     sys.exit(1)
 bzzoiro = BzzoiroClient(api_key=BZZOIRO_KEY)
+
+# Stocker le singleton pour prefilter() (filtre cote en amont)
+import src.orchestrator as _orch_module
+_orch_module._BZZOIRO_SINGLETON = bzzoiro
 
 api_football = None
 if os.environ.get("API_FOOTBALL_KEY"):

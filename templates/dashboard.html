@@ -4,79 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>Kenny Football · Dashboard Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/output.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
-                    },
-                    colors: {
-                        bg: '#0a0a0a', card: '#111111', cardHover: '#161616',
-                        accent: '#4ade80', accentDim: '#22c55e',
-                        danger: '#ef4444', warning: '#f59e0b',
-                    },
-                    boxShadow: { glow: '0 0 24px rgba(74, 222, 128, 0.12)' },
-                }
-            }
-        }
-    </script>
-    <style>
-        * { -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: #0a0a0a; color: #e5e5e5; overscroll-behavior: none; }
-        body::before {
-            content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-            background-size: 40px 40px; pointer-events: none; z-index: 0;
-        }
-        .content { position: relative; z-index: 1; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #0a0a0a; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-        .card { background: #111111; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
-        .pulse-dot { animation: pulse-dot 2s infinite; }
-        @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
-        .tab-active { color: #4ade80; }
-        .tab-active .tab-icon { filter: drop-shadow(0 0 8px rgba(74,222,128,0.4)); }
-        .header-sticky { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(10, 10, 10, 0.88); border-bottom: 1px solid rgba(255,255,255,0.06); }
-        .btn-analyze { background: linear-gradient(135deg, #22c55e, #4ade80); color: #0a0a0a; font-weight: 700; transition: all 0.2s; box-shadow: 0 0 20px rgba(74, 222, 128, 0.25); }
-        .btn-analyze:hover { box-shadow: 0 0 32px rgba(74, 222, 128, 0.4); transform: translateY(-1px); }
-        .btn-analyze:active { transform: translateY(0); }
-        .match-row { padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
-        .match-row:hover { background: rgba(255,255,255,0.02); }
-        .match-row:first-child { border-top: none; }
-        .league-header { padding: 10px 16px; background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #a3a3a3; display: flex; justify-content: space-between; align-items: center; }
-        .league-header:first-child { border-top: none; }
-        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; border: 1px solid; }
-        .badge-strong { background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.3); }
-        .badge-medium { background: rgba(245,158,11,0.1); color: #fbbf24; border-color: rgba(245,158,11,0.3); }
-        .badge-weak { background: rgba(249,115,22,0.1); color: #fb923c; border-color: rgba(249,115,22,0.3); }
-        .badge-rejected { background: rgba(115,115,115,0.1); color: #a3a3a3; border-color: rgba(115,115,115,0.3); }
-        .badge-live { background: rgba(239,68,68,0.15); color: #f87171; border-color: rgba(239,68,68,0.35); }
-        .badge-soon { background: rgba(245,158,11,0.12); color: #fbbf24; border-color: rgba(245,158,11,0.3); }
-        .market-tab { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); transition: all 0.15s; }
-        .market-tab:hover:not(.market-active) { background: rgba(255,255,255,0.06); color: #e5e5e5; }
-        .market-active { background: rgba(74,222,128,0.12) !important; color: #4ade80 !important; border-color: rgba(74,222,128,0.3) !important; }
-        .score-tab { flex: 1; padding: 8px 0; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: #737373; transition: all 0.15s; cursor: pointer; }
-        .score-tab:hover:not(.score-active):not(.score-disabled) { background: rgba(255,255,255,0.06); color: #e5e5e5; }
-        .score-active { background: rgba(74,222,128,0.15) !important; color: #4ade80 !important; border-color: rgba(74,222,128,0.4) !important; box-shadow: 0 0 12px rgba(74,222,128,0.15); }
-        .score-disabled { opacity: 0.35; cursor: not-allowed; }
-        .score-disabled::after { content: ' 🚧'; font-size: 9px; }
-        .coming-soon { text-align: center; padding: 3rem 1rem; }
-        .coming-soon .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.6; }
-        .coming-soon .title { font-size: 1.1rem; font-weight: 700; color: #e5e5e5; margin-bottom: 0.5rem; }
-        .coming-soon .desc { font-size: 0.8rem; color: #737373; }
-        .score-row-enter { animation: slideDown 0.25s ease-out; }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-4px); max-height: 0; } to { opacity: 1; transform: translateY(0); max-height: 100px; } }
-    </style>
+    
+    
 </head>
 <body>
     <div class="content min-h-screen pb-24">
