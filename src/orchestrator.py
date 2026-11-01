@@ -303,7 +303,7 @@ class MatchPipeline:
                 "warnings": ["cote absente"],
                 "layers": layers_dict_tmp,
             }
-        if cote_over > 1.90:
+        if cote_over > 2.50:
             # Cote trop élevée = marché sceptique
             layers_dict_tmp = {str(r.layer_id): r.score for r in results}
             return {
