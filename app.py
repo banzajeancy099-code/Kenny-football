@@ -20,6 +20,13 @@ from src.clients.api_football import APIFootballClient
 from src.orchestrator import MatchPipeline, prefilter
 from src.clients.pinnapi_client import PinnapiClient
 from src.db import init_db, save_predictions as db_save, load_predictions as db_load, get_archive
+from datetime import datetime, timezone, timedelta
+
+KINSHASA_TZ = timezone(timedelta(hours=1))
+
+def today_kinshasa():
+    return datetime.now(KINSHASA_TZ).date()
+
 
 # ========== LOGGER ==========
 logging.basicConfig(
@@ -149,7 +156,7 @@ def _run_analysis_job(job_id, matches):
                 "status": "running", "total": len(matches), "done": 0,
                 "retenus": 0, "started_at": datetime.now().isoformat(),
             }
-        today = date.today()
+        today = today_kinshasa()
         data = load_predictions(today)
         data["matches"] = {}
         data["last_update"] = datetime.now().isoformat()
@@ -188,7 +195,7 @@ def _run_analysis_job(job_id, matches):
 def job_analyse_quotidienne():
     log.info("🕛 [CRON] Analyse initiale quotidienne")
     try:
-        today = date.today()
+        today = today_kinshasa()
         all_matches = bzzoiro.get_matches_today(today.isoformat())
         matches = [m for m in all_matches if prefilter(m)]
         log.info(f"[CRON] {len(all_matches)} → {len(matches)} après pré-filtre")
@@ -216,7 +223,7 @@ def job_refresh_cotes(force=False):
     
     log.info(f"🔄 [CRON] Refresh cotes {now.strftime('%H:%M')}")
     try:
-        today = date.today()
+        today = today_kinshasa()
         data = load_predictions(today)
         if not data.get("matches"):
             return
@@ -430,7 +437,7 @@ def catch_up_analysis_if_needed():
     try:
         from datetime import date
         from src.db import load_predictions as db_load
-        today = date.today()
+        today = today_kinshasa()
         data = db_load(today)
         if not data.get("matches"):
             log.info("🔄 Rattrapage : analyse du jour absente, lancement immédiat...")
@@ -483,7 +490,7 @@ def health():
 @app.route("/api/prefilter/preview")
 def prefilter_preview():
     try:
-        today = date.today().isoformat()
+        today = today_kinshasa().isoformat()
         all_m = bzzoiro.get_matches_today(today)
         filtered = [m for m in all_m if prefilter(m)]
         return jsonify({
@@ -498,7 +505,7 @@ def prefilter_preview():
 def analyze_start():
     try:
         limit = int(request.args.get("limit", 200))
-        today = date.today().isoformat()
+        today = today_kinshasa().isoformat()
         all_m = bzzoiro.get_matches_today(today)
         filtered = [m for m in all_m if prefilter(m)][:limit]
         if not filtered:
@@ -528,7 +535,7 @@ def analyze_status(job_id):
 @app.route("/api/analyze")
 def analyze_sync():
     try:
-        today = date.today().isoformat()
+        today = today_kinshasa().isoformat()
         all_m = bzzoiro.get_matches_today(today)
         filtered = [m for m in all_m if prefilter(m)][:20]
         results = []
@@ -549,7 +556,7 @@ def analyze_sync():
 @app.route("/api/live")
 def live_scores():
     """Renvoie les scores live des matchs en cours (refresh 60s côté client)."""
-    today = date.today()
+    today = today_kinshasa()
     data = load_predictions(today)
     matches_dict = data.get("matches") or {}
     if not isinstance(matches_dict, dict):
@@ -582,7 +589,7 @@ def live_scores():
 @app.route("/api/predictions")
 def predictions_today():
     """Renvoie les prédictions ACTIVES (matchs pas encore terminés = à venir + live)."""
-    today = date.today()
+    today = today_kinshasa()
     data = load_predictions(today)
     matches_dict = data.get("matches") or {}
     if not isinstance(matches_dict, dict):
@@ -655,7 +662,7 @@ def predictions_today():
 @app.route("/api/predictions/filtered")
 def predictions_filtered():
     kind = request.args.get("kind", "all")
-    today = date.today()
+    today = today_kinshasa()
     data = load_predictions(today)
     matches_dict = data.get("matches") or {}
     if not isinstance(matches_dict, dict):
