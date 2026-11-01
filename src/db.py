@@ -199,6 +199,14 @@ def save_predictions(d: date, data: dict):
             conn.commit()
             return True
         except Exception as e:
+            import logging
+            logging.getLogger("db").error(f"[save_predictions] ERREUR: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            return False
+        except Exception as e:
             log.error(f"[save_predictions] ❌ ERREUR : {e}")
             try:
                 conn.rollback()

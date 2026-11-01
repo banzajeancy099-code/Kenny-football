@@ -7,3 +7,4 @@ python-dateutil>=2.8.2
 atoma>=0.0.17
 psycopg2-binary>=2.9.9
 psycopg2>=2.9.0
+pg8000>=1.30.0
