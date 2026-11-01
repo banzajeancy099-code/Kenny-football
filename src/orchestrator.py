@@ -28,6 +28,7 @@ from src.layers.l33_squad_depth import SquadDepthLayer
 from src.layers.l35_red_flags import RedFlagsLayer
 from src.layers.l40_momentum_advanced import MomentumAdvancedLayer
 from src.layers.l42_split_performance import SplitPerformanceLayer
+from src.layers.l44_profile import ProfileLayer
 from src.layers.l34_context_enjeu import ContextEnjeuLayer
 from src.scoring import BayesianScorer
 
@@ -69,9 +70,11 @@ def _get_league_stats(bzzoiro):
 
 
 
+_BZZOIRO_SINGLETON = None
+
 log = logging.getLogger("orchestrator")
 
-TARGET_LEAGUES = {1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 14, 15, 18, 19, 26, 34, 54, 85, 89, 94, 96}
+TARGET_LEAGUES = {1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 14, 15, 18, 19, 26, 34, 38, 54, 84, 89, 94, 96, 100, 107, 108}
 
 LEAGUES = {
     1: "Premier League", 4: "Serie A", 5: "Bundesliga",
@@ -80,6 +83,11 @@ LEAGUES = {
     18: "MLS", 19: "Liga MX", 54: "Eliteserien", 96: "Bundesliga AT",
     3: "La Liga", 34: "Brasileirão B", 85: "Primera División ARG", 89: "Ligue 2",
     94: "2. Bundesliga",
+    38: "Segunda División",
+    84: "Danish Superliga",
+    100: "Serie B (ITA)",
+    107: "Trendyol 1. Lig (TUR)",
+    108: "Eerste Divisie",
     2: "Liga Portugal",
     11: "Super Lig (TUR)",
     26: "Allsvenskan",
@@ -105,7 +113,31 @@ def prefilter(match: dict) -> bool:
         h2h_total = len(h2h)
     else:
         h2h_total = 0
-    return h2h_total >= 3
+    # H2H : accepter les matchs avec au moins 1 confrontation
+    # (3 était trop strict, éliminait 80% des matchs)
+    if h2h_total < 1:
+        return False
+
+    # === FILTRE COTE : exclure les matchs sans cote exploitable AVANT l'analyse ===
+    # On ne garde que les matchs avec une cote Over 2.5 dans la plage 1.35 - 2.50
+    # (le moteur utilise ces cotes pour calculer l'edge, autant les filtrer en amont)
+    match_id = match.get("id") or match.get("event_id")
+    if match_id:
+        try:
+            from src.clients.bzzoiro import BzzoiroClient
+            # Le client est passé via une variable globale (voir app.py)
+            bz = _BZZOIRO_SINGLETON
+            if bz:
+                odds_data = bz.get_event_odds(match_id)
+                odds = odds_data.get("odds", {}) if isinstance(odds_data, dict) else {}
+                cote_over = odds.get("over_25_goals")
+                if cote_over is None or cote_over < 1.35 or cote_over > 2.50:
+                    return False
+        except Exception:
+            # Si on ne peut pas récupérer la cote, on rejette le match
+            return False
+
+    return True
 
 
 
@@ -129,6 +161,8 @@ def _score_to_proba(score):
 
 class MatchPipeline:
     def __init__(self, bzzoiro, api_football, weights, league_over_rates):
+        global _BZZOIRO_SINGLETON
+        _BZZOIRO_SINGLETON = bzzoiro
         self.bzzoiro = bzzoiro
         self.layers = [
             StrengthLayer(bzzoiro),
@@ -159,6 +193,7 @@ class MatchPipeline:
             RedFlagsLayer(bzzoiro),
             MomentumAdvancedLayer(bzzoiro),
             SplitPerformanceLayer(bzzoiro),
+            ProfileLayer(bzzoiro),
             ContextEnjeuLayer(bzzoiro),
         ]
         self.scorer = BayesianScorer(weights)
