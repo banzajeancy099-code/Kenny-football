@@ -393,14 +393,14 @@ def get_archive(limit=90):
                     day_matches.append({
                         "home": m[0],
                         "away": m[1],
-                        "score": m[2],
+                        "score": float(m[2]) if m[2] is not None else 0.0,
                         "result_verdict": m[3],
-                        "mise_kelly": m[4],
-                        "mise_under": m[5],
-                        "cote_over": m[6],
-                        "cote_under": m[7],
-                        "proba_over": m[8],
-                        "edge": m[9],
+                        "mise_kelly": float(m[4]) if m[4] is not None else 0.0,
+                        "mise_under": float(m[5]) if m[5] is not None else 0.0,
+                        "cote_over": float(m[6]) if m[6] is not None else None,
+                        "cote_under": float(m[7]) if m[7] is not None else None,
+                        "proba_over": float(m[8]) if m[8] is not None else None,
+                        "edge": float(m[9]) if m[9] is not None else None,
                         "is_under_bet": m[10],
                     })
 
