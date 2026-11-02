@@ -279,7 +279,6 @@ def load_predictions(d: date):
                 if signal == "rejected":
                     m["mise_kelly"] = 0.0
                     m["mise_btts"] = 0.0
-                    m["mise_under"] = 0.0
 
             return {
                 "date": d.isoformat(),
@@ -331,7 +330,6 @@ def load_predictions(d: date):
                 if signal == "rejected":
                     m["mise_kelly"] = 0.0
                     m["mise_btts"] = 0.0
-                    m["mise_under"] = 0.0
 
             return {
                 "date": d.isoformat(),
