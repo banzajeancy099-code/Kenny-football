@@ -1002,18 +1002,19 @@ def api_team_logo():
     """Récupère le logo d'une équipe via API-Football (avec cache)."""
     import os as _os, requests as _requests
     from flask import request, jsonify
-    
+
     name = request.args.get('name', '').strip()
     if not name:
         return jsonify({'error': 'name manquant'}), 400
-    
+
+    # Cache mémoire
     if name.lower() in _team_logo_cache:
         return jsonify(_team_logo_cache[name.lower()])
-    
+
     api_key = _os.environ.get('API_FOOTBALL_KEY')
     if not api_key:
         return jsonify({'logo': None, 'error': 'API key manquante'}), 200
-    
+
     try:
         r = _requests.get(
             "https://v3.football.api-sports.io/teams",
@@ -1024,19 +1025,153 @@ def api_team_logo():
         if r.status_code == 200:
             data = r.json()
             if data.get('response'):
-                team = data['response'][0]['team']
+                # Filtrer les équipes réserves (II, B, Reserve, U19, etc.)
+                exclude_suffixes = [' ii', ' b', ' reserve', ' u19', ' u21', ' u23', ' women', ' féminin', ' feminin']
+
+                def is_main_team(t):
+                    n = (t.get('name') or '').lower().strip()
+                    return not any(n.endswith(s) or n == s.strip() for s in exclude_suffixes)
+
+                teams = [item['team'] for item in data['response']]
+                main_teams = [t for t in teams if is_main_team(t)]
+                team = main_teams[0] if main_teams else teams[0]
+
                 result = {
                     'logo': team.get('logo'),
                     'name': team.get('name'),
                     'api_football_id': team.get('id'),
                 }
                 _team_logo_cache[name.lower()] = result
-                log.info(f"[LOGO] {name} -> {result['logo']}")
+                log.info(f"[LOGO] {name} -> {result['name']} ({result['api_football_id']})")
                 return jsonify(result)
     except Exception as e:
         log.warning(f"[LOGO] {name}: {e}")
-    
+
     return jsonify({'logo': None})
+
+
+
+@app.route('/api/match-lineup/<int:match_id>')
+def api_match_lineup(match_id):
+    """Récupère la composition + photos + logos pour la vue terrain."""
+    import os as _os, requests as _requests
+    from flask import jsonify
+    import unicodedata
+    
+    def normalize(s):
+        return unicodedata.normalize('NFKD', s or '').encode('ascii', 'ignore').decode('ascii').lower().strip()
+    
+    # 1. Récupérer les lineups Bzzoiro
+    try:
+        lineups = bzzoiro.get_event_lineups(match_id)
+    except Exception as e:
+        return jsonify({'error': f'lineups: {e}'}), 500
+    
+    if not lineups or 'lineups' not in lineups:
+        return jsonify({'error': 'lineups indisponibles'}), 404
+    
+    api_key = _os.environ.get('API_FOOTBALL_KEY')
+    
+    def get_team_logo_and_id(team_name):
+        """Récupère logo + id API-Football."""
+        key = team_name.lower().strip()
+        if key in _team_logo_cache:
+            return _team_logo_cache[key]
+        if not api_key:
+            return {'logo': None, 'api_football_id': None}
+        try:
+            r = _requests.get(
+                "https://v3.football.api-sports.io/teams",
+                params={"search": team_name},
+                headers={"x-apisports-key": api_key},
+                timeout=8,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if data.get('response'):
+                    exclude = [' ii', ' b', ' reserve', ' u19', ' u21', ' u23', ' women']
+                    teams = [item['team'] for item in data['response']]
+                    main = [t for t in teams if not any((t.get('name') or '').lower().endswith(s) for s in exclude)]
+                    team = main[0] if main else teams[0]
+                    result = {
+                        'logo': team.get('logo'),
+                        'name': team.get('name'),
+                        'api_football_id': team.get('id'),
+                    }
+                    _team_logo_cache[key] = result
+                    return result
+        except Exception as e:
+            log.warning(f"[LINEUP LOGO] {team_name}: {e}")
+        return {'logo': None, 'api_football_id': None}
+    
+    def find_photo(player_name, squad):
+        if not squad:
+            return None
+        p_norm = normalize(player_name)
+        p_words = [w for w in p_norm.split() if len(w) > 2]
+        # Match exact
+        for sp in squad:
+            if normalize(sp.get('name')) == p_norm:
+                return sp.get('photo')
+        # Match partiel
+        for sp in squad:
+            sp_norm = normalize(sp.get('name'))
+            sp_words = [w for w in sp_norm.split() if len(w) > 2]
+            common = [w for w in p_words if w in sp_words]
+            if len(common) >= 2:
+                return sp.get('photo')
+        # Match 1 mot
+        if len(p_words) == 1:
+            for sp in squad:
+                if p_words[0] in normalize(sp.get('name')):
+                    return sp.get('photo')
+        return None
+    
+    def extract_team(team_data):
+        players = team_data.get('players', [])
+        formation = team_data.get('formation', '4-4-2')
+        team_name = team_data.get('team_name', '')
+        
+        # Logo + squad
+        team_info = get_team_logo_and_id(team_name)
+        team_id_af = team_info.get('api_football_id')
+        squad = _get_squad(team_id_af) if team_id_af else []
+        
+        # Désigner le joueur clé (ai_score max)
+        captain_idx = -1
+        best_score = -1
+        for i, p in enumerate(players):
+            sc = p.get('ai_score') or 0
+            if sc > best_score:
+                best_score = sc
+                captain_idx = i
+        
+        result_players = []
+        for i, p in enumerate(players):
+            result_players.append({
+                'name': p.get('name'),
+                'short_name': p.get('short_name'),
+                'position': p.get('position', 'M'),
+                'number': p.get('jersey_number'),
+                'photo': find_photo(p.get('name'), squad),
+                'is_captain': (i == captain_idx),
+                'ai_score': p.get('ai_score'),
+            })
+        
+        return {
+            'team_name': team_name,
+            'formation': formation,
+            'logo': team_info.get('logo'),
+            'players': result_players,
+        }
+    
+    home_data = lineups['lineups'].get('home', {})
+    away_data = lineups['lineups'].get('away', {})
+    
+    return jsonify({
+        'home': extract_team(home_data),
+        'away': extract_team(away_data),
+    })
 
 
 if __name__ == "__main__":
