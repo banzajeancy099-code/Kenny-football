@@ -566,6 +566,8 @@ class MatchPipeline:
         return {
             "match_id": match.get("id") or match.get("event_id"),
             "home": home,
+            "home_team_id": match.get("home_team_id"),
+            "away_team_id": match.get("away_team_id"),
             "away": away,
             "league_id": league_id,
             "league_name": league_name,
