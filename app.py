@@ -397,6 +397,22 @@ def job_snapshot_pinnacle():
                     pred["cote_pinnacle_over"] = pinnacle["over_2_5"]
                     pred["pinnacle_status"] = "available"
                     pinnacle_updated += 1
+
+                    # 💾 Sauvegarder le snapshot en base Neon (pour L13 et backtest)
+                    try:
+                        from src.db import save_odds_snapshot
+                        save_odds_snapshot(
+                            timestamp=datetime.now(timezone.utc),
+                            sport_key=pinnacle.get("fixture_id") or "unknown",
+                            home=pinnacle.get("home") or home,
+                            away=pinnacle.get("away") or away,
+                            best_over_2_5=pinnacle["over_2_5"],
+                            bookmaker="pinnacle",
+                            raw=pinnacle,
+                        )
+                        log.info(f"[PINNACLE] Snapshot DB OK : {home} vs {away} @ {pinnacle['over_2_5']}")
+                    except Exception as e_snap:
+                        log.warning(f"[PINNACLE] save_odds_snapshot échoué {home} vs {away}: {e_snap}")
                 else:
                     pred["pinnacle_status"] = "pending"
             except Exception as e:

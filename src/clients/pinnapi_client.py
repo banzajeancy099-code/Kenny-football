@@ -61,7 +61,7 @@ class PinnapiClient:
         return []
 
     def find_fixture_odds(self, home_name, away_name, league_id=None, fixtures=None):
-        """Cherche les cotes Pinnacle pour un match."""
+        """Cherche les cotes Pinnacle pour un match (Over/Under 2.5 ET 2.75)."""
         if not self.available:
             return None
 
@@ -112,7 +112,9 @@ class PinnapiClient:
                 if not (_match(home_l, m_home) and _match(away_l, m_away)):
                     continue
 
-                over_2_5 = None
+                # Collecte tous les points disponibles puis choisit le plus proche de 2.5
+                over_by_point = {}
+                under_by_point = {}
                 for bk in m.get("bookmakers", []):
                     if bk.get("key") != "pinnacle":
                         continue
@@ -120,15 +122,32 @@ class PinnapiClient:
                         if mkt.get("key") != "totals":
                             continue
                         for o in mkt.get("outcomes", []):
-                            if o.get("name") == "Over" and o.get("point") == 2.5:
-                                over_2_5 = o.get("price")
-                                break
+                            pt = o.get("point")
+                            if pt in (2.25, 2.5, 2.75):
+                                if o.get("name") == "Over":
+                                    over_by_point[pt] = o.get("price")
+                                elif o.get("name") == "Under":
+                                    under_by_point[pt] = o.get("price")
+
+                # Pinnacle ajuste sa ligne : on ne garde QUE si point == 2.5
+                # Sinon la cote n'est pas comparable à Over/Under 2.5
+                over_2_5 = None
+                under_2_5 = None
+                over_point = None
+                if 2.5 in over_by_point:
+                    over_2_5 = over_by_point[2.5]
+                    over_point = 2.5
+                if 2.5 in under_by_point:
+                    under_2_5 = under_by_point[2.5]
 
                 return {
                     "fixture_id": m.get("id"),
                     "home": m.get("home_team"),
                     "away": m.get("away_team"),
                     "over_2_5": over_2_5,
+                    "under_2_5": under_2_5,
+                    "point": over_point,
+                    "available_points": list(over_by_point.keys()),
                     "btts_yes": None,
                 }
 
