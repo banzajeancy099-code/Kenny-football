@@ -326,6 +326,185 @@
 
         summary::-webkit-details-marker { display: none; }
         details[open] > summary span:first-child { transform: rotate(90deg); display: inline-block; }
+
+        /* === VUE TERRAIN === */
+        .pitch {
+            background: linear-gradient(180deg, #15803d 0%, #166534 50%, #15803d 100%);
+            border-radius: 12px;
+            padding: 16px 8px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .pitch::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(255,255,255,0.25);
+        }
+        .pitch::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 50%;
+        }
+        .pitch-team {
+            position: relative;
+            z-index: 1;
+            margin: 8px 0;
+        }
+        .pitch-team-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 6px 12px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
+        }
+        .pitch-team-logo {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+        }
+        .pitch-team-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+        }
+        .pitch-formation {
+            font-size: 9px;
+            color: rgba(255,255,255,0.6);
+            margin-left: 4px;
+        }
+        .pitch-row {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin: 8px 0;
+            flex-wrap: wrap;
+        }
+        .pitch-player {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 50px;
+            max-width: 60px;
+        }
+        .pitch-player-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.3);
+            object-fit: cover;
+            position: relative;
+        }
+        .pitch-player.is-captain .pitch-player-avatar {
+            border-color: #fbbf24;
+            box-shadow: 0 0 12px rgba(251,191,36,0.6);
+        }
+        .pitch-player-number {
+            position: absolute;
+            bottom: -4px;
+            right: -4px;
+            background: #0a0a0a;
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .pitch-player-name {
+            font-size: 9px;
+            color: white;
+            margin-top: 4px;
+            text-align: center;
+            line-height: 1.1;
+            max-width: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pitch-player-score {
+            font-size: 8px;
+            color: #fbbf24;
+            font-weight: 700;
+        }
+
+        /* === CARTE JOUEUR CLÉ === */
+        .star-cards {
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .star-card {
+            flex: 1;
+            background: linear-gradient(145deg, rgba(30,30,30,0.95), rgba(15,15,15,0.95));
+            border: 1px solid rgba(74,222,128,0.3);
+            border-radius: 12px;
+            padding: 8px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .star-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #4ade80, transparent);
+        }
+        .star-card-avatar {
+            width: 100%;
+            aspect-ratio: 3/4;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.5);
+            object-fit: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: #4ade80;
+            margin-bottom: 6px;
+        }
+        .star-card-name {
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .star-card-badge {
+            font-size: 8px;
+            color: #fbbf24;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+        .star-card-photo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
 </style>
 </head>
 <body>
@@ -359,7 +538,7 @@
         <div class="sticky top-[57px] z-30 border-b border-white/5" style="backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(10,10,10,0.92);">
             <div class="max-w-2xl mx-auto px-4 pt-2 pb-1">
                 <div class="market-bar flex gap-2 overflow-x-auto">
-                    <button data-market="all" class="market-btn active">Tous</button>
+                    <button data-market="all" class="market-btn">Tous</button>
                     <button data-market="over" class="market-btn">Over</button>
                     <button data-market="btts" class="market-btn">BTTS</button>
                     <button data-market="under" class="market-btn">Under</button>
@@ -475,12 +654,11 @@
 
         function switchMarket(market) {
             currentMarket = market;
-            document.querySelectorAll('.market-tab').forEach(el => {
-                el.classList.remove('market-active');
-                el.classList.add('text-neutral-500');
+            document.querySelectorAll('.market-btn').forEach(el => {
+                el.classList.remove('active');
             });
-            const active = document.querySelector(`[data-market="${market}"]`);
-            if (active) { active.classList.add('market-active'); active.classList.remove('text-neutral-500'); }
+            const active = document.querySelector(`.market-btn[data-market="${market}"]`);
+            if (active) { active.classList.add('active'); }
 
             const scoreBar = document.getElementById('score-bar');
             if (market === 'over' || market === 'under') { scoreBar.classList.remove('hidden'); }
@@ -489,8 +667,17 @@
             updateHomeTitle();
             loadHome();
         }
-        document.querySelectorAll('.market-tab').forEach(tab => {
+        document.querySelectorAll('.market-btn').forEach(tab => {
             tab.addEventListener('click', () => switchMarket(tab.dataset.market));
+        });
+
+        // Fallback : marquer "Tous" comme actif au démarrage
+        document.addEventListener('DOMContentLoaded', () => {
+            const anyActive = document.querySelector('.market-btn.active');
+            if (!anyActive) {
+                const allBtn = document.querySelector('.market-btn[data-market="all"]');
+                if (allBtn) allBtn.classList.add('active');
+            }
         });
 
         function switchScore(score) {
@@ -638,6 +825,22 @@
                 
                 const weather = data.weather || {};
                 let html = '';
+
+                // === CARTES JOUEURS CLÉS (en haut) ===
+                const topPlayers = data.top_players || {};
+                html += '<div class="star-cards">';
+                for (const side of ['home', 'away']) {
+                    const players = topPlayers[side] || [];
+                    const star = players.length > 0 ? players[0] : null;
+                    const starName = star ? star.name : '—';
+                    const initial = starName.substring(0, 2).toUpperCase();
+                    html += '<div class="star-card">';
+                    html += '  <div class="star-card-avatar" id="star-card-' + side + '">' + initial + '</div>';
+                    html += '  <div class="star-card-name">' + starName + '</div>';
+                    html += '  <div class="star-card-badge">⭐ Joueur clé</div>';
+                    html += '</div>';
+                }
+                html += '</div>';
                 
                 // En-tête
                 html += '<div class="grid grid-cols-3 gap-2 text-sm">';
@@ -650,36 +853,29 @@
                 html += '<div class="bg-bg/50 rounded-lg p-4">';
                 html += '  <div class="flex items-center justify-between gap-2">';
                 html += '    <div class="flex flex-col items-center flex-1 min-w-0">';
-                html += '      <div class="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center text-lg font-bold text-white" id="home-avatar">' + (m.home || '?').substring(0, 2).toUpperCase() + '</div>';
+                html += '      <div class="relative">';
+                html += '        <div class="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center text-lg font-bold text-white" id="home-avatar">' + (m.home || '?').substring(0, 2).toUpperCase() + '</div>';
+                html += '        <img src="" alt="" class="w-8 h-8 rounded-full border-2 border-accent absolute -bottom-1 -right-1 bg-neutral-900 object-cover" id="home-star-avatar" style="display:none;" />';
+                html += '      </div>';
                 html += '      <div class="text-xs font-bold text-white mt-2 text-center leading-tight">' + (m.home || '?') + '</div>';
                 html += '    </div>';
                 html += '    <div class="flex flex-col items-center px-2">';
                 html += '      <div class="mono text-3xl font-extrabold text-accent">' + (m.score || 0).toFixed(2) + '</div>';
-                html += '      <div class="text-[9px] text-neutral-500 uppercase">Score</div>';
+                html += '      <div class="text-[9px] text-neutral-500 uppercase">VS</div>';
                 html += '      <div class="mt-1">' + signalBadge(m.signal_strength) + '</div>';
                 html += '    </div>';
                 html += '    <div class="flex flex-col items-center flex-1 min-w-0">';
-                html += '      <div class="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center text-lg font-bold text-white" id="away-avatar">' + (m.away || '?').substring(0, 2).toUpperCase() + '</div>';
+                html += '      <div class="relative">';
+                html += '        <div class="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center text-lg font-bold text-white" id="away-avatar">' + (m.away || '?').substring(0, 2).toUpperCase() + '</div>';
+                html += '        <img src="" alt="" class="w-8 h-8 rounded-full border-2 border-accent absolute -bottom-1 -right-1 bg-neutral-900 object-cover" id="away-star-avatar" style="display:none;" />';
+                html += '      </div>';
                 html += '      <div class="text-xs font-bold text-white mt-2 text-center leading-tight">' + (m.away || '?') + '</div>';
                 html += '    </div>';
                 html += '  </div>';
                 html += '</div>';
                 
-                // Top joueurs
-                const topPlayers = data.top_players || {};
-                for (const side of ['home', 'away']) {
-                    const players = topPlayers[side] || [];
-                    if (players.length === 0) continue;
-                    const teamName = side === 'home' ? m.home : m.away;
-                    html += '<div><div class="text-[10px] text-neutral-500 uppercase mb-2">⭐ Top joueurs — ' + teamName + '</div><div class="space-y-1">';
-                    players.forEach((p, i) => {
-                        html += '<div class="flex justify-between items-center bg-bg/30 rounded-lg p-2 text-sm">';
-                        html += '<span class="font-bold text-white">' + (i+1) + '. ' + p.name + '</span>';
-                        html += '<span class="mono text-xs text-accent">' + p.goals + '⚽ · ' + p.xg + ' xG</span>';
-                        html += '</div>';
-                    });
-                    html += '</div></div>';
-                }
+                // Vue terrain (compositions)
+                html += '<div id="pitch-container"></div>';
                 
                 // Classements
                 const homeP = data.home_position || {};
@@ -693,6 +889,9 @@
                 
                 // Charger les logos en async
                 loadTeamLogos(m.home, m.away);
+                loadStarPlayers(data.top_players, m.home, m.away);
+                if (m.match_id) loadMatchLineup(m.match_id, 'pitch-container');
+                if (m.match_id) loadMatchLineup(m.match_id, 'pitch-container');
             } catch (e) {
                 document.getElementById('modal-content').innerHTML = '<div class="text-center text-danger p-4">Erreur: ' + e.message + '</div>';
             }
@@ -700,6 +899,124 @@
 
         function closeModal() {
             document.getElementById('match-modal').classList.add('hidden');
+        }
+
+        async function loadMatchLineup(matchId, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '<div class="text-center text-xs text-neutral-500 py-4">⏳ Chargement compositions...</div>';
+            
+            try {
+                const r = await fetch('/api/match-lineup/' + matchId);
+                if (!r.ok) {
+                    container.innerHTML = '<div class="text-center text-xs text-neutral-500 py-4">Compositions non disponibles</div>';
+                    return;
+                }
+                const data = await r.json();
+                if (data.error) {
+                    container.innerHTML = '<div class="text-center text-xs text-neutral-500 py-4">' + data.error + '</div>';
+                    return;
+                }
+                
+                let html = '<div class="pitch">';
+                html += renderPitchTeam(data.home, 'home');
+                html += renderPitchTeam(data.away, 'away');
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div class="text-center text-xs text-danger py-4">Erreur: ' + e.message + '</div>';
+            }
+        }
+
+        function renderPitchTeam(team, side) {
+            if (!team) return '';
+            const formation = team.formation || '4-4-2';
+            const players = team.players || [];
+            
+            // Grouper par position
+            const byPos = { G: [], D: [], M: [], A: [] };
+            players.forEach(p => {
+                const pos = (p.position || 'M').toUpperCase();
+                if (byPos[pos]) byPos[pos].push(p);
+                else byPos.M.push(p);
+            });
+            
+            let html = '<div class="pitch-team">';
+            
+            // En-tête équipe
+            html += '<div class="pitch-team-header">';
+            if (team.logo) {
+                html += '<img src="' + team.logo + '" class="pitch-team-logo" alt="' + team.team_name + '" />';
+            } else {
+                html += '<div class="pitch-team-logo bg-neutral-700 rounded-full flex items-center justify-center text-[8px] font-bold">' + (team.team_name || '?').substring(0,2).toUpperCase() + '</div>';
+            }
+            html += '<span class="pitch-team-name">' + (team.team_name || '?') + '</span>';
+            html += '<span class="pitch-formation">' + formation + '</span>';
+            html += '</div>';
+            
+            // Ordre d'affichage selon le côté :
+            // HOME : A → M → D → G (attaquants en haut, gardien en bas)
+            // AWAY : G → D → M → A (gardien en haut, attaquants en bas)
+            const order = side === 'home' ? ['A', 'M', 'D', 'G'] : ['G', 'D', 'M', 'A'];
+            
+            for (const pos of order) {
+                const posPlayers = byPos[pos] || [];
+                if (posPlayers.length === 0) continue;
+                
+                html += '<div class="pitch-row">';
+                posPlayers.forEach(p => {
+                    html += renderPitchPlayer(p);
+                });
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function renderPitchPlayer(p) {
+            const captainClass = p.is_captain ? ' is-captain' : '';
+            const initial = (p.short_name || p.name || '?').substring(0, 2).toUpperCase();
+            
+            let html = '<div class="pitch-player' + captainClass + '">';
+            html += '<div style="position: relative;">';
+            if (p.photo) {
+                html += '<img src="' + p.photo + '" class="pitch-player-avatar" alt="' + (p.name || '') + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';" />';
+                html += '<div class="pitch-player-avatar" style="display:none; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:white;">' + initial + '</div>';
+            } else {
+                html += '<div class="pitch-player-avatar" style="display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:white;">' + initial + '</div>';
+            }
+            if (p.number) {
+                html += '<span class="pitch-player-number">' + p.number + '</span>';
+            }
+            html += '</div>';
+            html += '<div class="pitch-player-name">' + (p.short_name || p.name || '?') + '</div>';
+            if (p.is_captain) {
+                html += '<div class="pitch-player-score">⭐ clé</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
+        async function loadStarPlayers(topPlayers, homeName, awayName) {
+            if (!topPlayers) return;
+            for (const side of ['home', 'away']) {
+                const players = topPlayers[side] || [];
+                if (players.length === 0) continue;
+                const star = players[0];
+                const teamName = side === 'home' ? homeName : awayName;
+                try {
+                    const r = await fetch('/api/player-photo?name=' + encodeURIComponent(star.name) + '&team=' + encodeURIComponent(teamName));
+                    if (!r.ok) continue;
+                    const d = await r.json();
+                    if (d.photo) {
+                        const el = document.getElementById('star-card-' + side);
+                        if (el) {
+                            el.innerHTML = '<img src="' + d.photo + '" class="star-card-photo" alt="' + star.name + '" />';
+                        }
+                    }
+                } catch (e) {}
+            }
         }
 
         async function loadTeamLogos(homeName, awayName) {
@@ -713,11 +1030,11 @@
                 
                 if (dH.logo) {
                     const el = document.getElementById('home-avatar');
-                    if (el) el.innerHTML = '<img src="' + dH.logo + '" class="w-14 h-14 object-contain" alt="' + homeName + '" />';
+                    if (el) el.innerHTML = '<img src="' + dH.logo + '" class="w-14 h-14 object-contain p-2" alt="' + homeName + '" />';
                 }
                 if (dA.logo) {
                     const el = document.getElementById('away-avatar');
-                    if (el) el.innerHTML = '<img src="' + dA.logo + '" class="w-14 h-14 object-contain" alt="' + awayName + '" />';
+                    if (el) el.innerHTML = '<img src="' + dA.logo + '" class="w-14 h-14 object-contain p-2" alt="' + awayName + '" />';
                 }
             } catch (e) {
                 console.warn('Logos indisponibles:', e);
