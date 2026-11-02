@@ -374,6 +374,36 @@ def get_archive(limit=90):
 
             out = []
             for row in rows:
+                day_date = row[0]
+                # Récupérer les matchs vérifiés de ce jour
+                cur2 = conn.cursor()
+                cur2.execute("""
+                    SELECT home, away, score, result_verdict,
+                           mise_kelly, mise_under, cote_over, cote_under,
+                           proba_over, edge, is_under_bet
+                    FROM predictions
+                    WHERE date = %s AND result_verdict IS NOT NULL
+                    ORDER BY score DESC
+                """, (day_date,))
+                day_matches_raw = cur2.fetchall()
+                cur2.close()
+
+                day_matches = []
+                for m in day_matches_raw:
+                    day_matches.append({
+                        "home": m[0],
+                        "away": m[1],
+                        "score": m[2],
+                        "result_verdict": m[3],
+                        "mise_kelly": m[4],
+                        "mise_under": m[5],
+                        "cote_over": m[6],
+                        "cote_under": m[7],
+                        "proba_over": m[8],
+                        "edge": m[9],
+                        "is_under_bet": m[10],
+                    })
+
                 out.append({
                     "date": row[0],
                     "total": row[1],
@@ -383,6 +413,7 @@ def get_archive(limit=90):
                     "wrong": row[5],
                     "verified": row[6],
                     "last_update": row[7],
+                    "matches": day_matches,
                 })
             return out
         except Exception as e:
