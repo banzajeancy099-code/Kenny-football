@@ -107,6 +107,14 @@ for i, match in enumerate(all_finished, 1):
             "proba_under": pred.get("proba_under"),
             "edge_under": pred.get("edge_under"),
             "mise_under": pred.get("mise_under", 0),
+            # === BTTS ===
+            "score_btts": pred.get("score_btts", 0),
+            "proba_btts": pred.get("proba_btts", 0),
+            "cote_btts_yes": pred.get("cote_btts_yes"),
+            "edge_btts": pred.get("edge_btts", 0),
+            "mise_btts": pred.get("mise_btts", 0),
+            "retenu_btts": pred.get("retenu_btts", False),
+            "correct_btts": (actual_goals >= 2) if pred.get("retenu_btts") else None,
         })
         if i % 10 == 0:
             print(f"  {i}/{len(all_finished)}...")
