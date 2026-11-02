@@ -167,7 +167,12 @@ def _run_analysis_job(job_id, matches):
 
         for i, m in enumerate(matches):
             try:
-                result = pipeline.run_with_pinnacle(m, pinnapi_client)
+                # Utiliser run() directement (USE_PINNACLE=false par défaut)
+                use_pinnacle = os.environ.get("USE_PINNACLE", "false").lower() == "true"
+                if use_pinnacle and pinnapi_client is not None:
+                    result = pipeline.run_with_pinnacle(m, pinnapi_client)
+                else:
+                    result = pipeline.run(m)
                 mid = str(result.get("match_id") or m.get("id"))
                 data["matches"][mid] = result
                 log.info(f"[SAVE] {result.get('home')} · pinnacle_status={result.get('pinnacle_status')} · edge_pinnacle={result.get('edge_pinnacle')}")
@@ -317,11 +322,91 @@ def job_refresh_cotes(force=False):
             except Exception as e:
                 log.debug(f"[CRON] refresh Pinnacle {mid}: {e}")
 
+        # === SNAPSHOT BZZOIRO SUR DISQUE (pour L13) ===
+        try:
+            import json
+            from pathlib import Path
+            snapshot_dir = Path("data/odds_snapshots")
+            snapshot_dir.mkdir(parents=True, exist_ok=True)
+            
+            timestamp_str = now.strftime("%Y%m%d_%H%M%S")
+            snapshot_file = snapshot_dir / f"{timestamp_str}.json"
+            
+            odds_snapshot = {"timestamp": now.isoformat(), "odds": {}}
+            for mid_snap, pred_snap in data["matches"].items():
+                cote_snap = pred_snap.get("cote_over")
+                if cote_snap is None:
+                    continue
+                sport_key_snap = f"soccer_{pred_snap.get('league_id', 'unknown')}"
+                if sport_key_snap not in odds_snapshot["odds"]:
+                    odds_snapshot["odds"][sport_key_snap] = []
+                odds_snapshot["odds"][sport_key_snap].append({
+                    "home": pred_snap.get("home", ""),
+                    "away": pred_snap.get("away", ""),
+                    "best_over_2_5": cote_snap,
+                    "bookmaker": "bzzoiro",
+                })
+            
+            with open(snapshot_file, "w") as f:
+                json.dump(odds_snapshot, f, indent=2)
+            
+            log.info(f"💾 Snapshot Bzzoiro : {snapshot_file.name} ({len(data['matches'])} matchs)")
+        except Exception as e:
+            log.warning(f"⚠️ Snapshot Bzzoiro échoué : {e}")
+
         data["last_update"] = now.isoformat()
         save_predictions(data, today)
         log.info(f"✅ [CRON] Refresh : {changed} Bzzoiro · {snapshots_saved} snapshots · {pinnacle_found} Pinnacle · {pinnacle_rejected} rejetés · {pinnacle_pending} en attente")
     except Exception as e:
         log.error(f"❌ [CRON] Refresh échoué : {e}", exc_info=True)
+
+
+def job_snapshot_pinnacle():
+    """Snapshot Pinnacle pour les matchs score >= 5.5 (23h30 UTC)."""
+    if os.environ.get("SNAPSHOT_PINNACLE", "false").lower() != "true":
+        return
+    
+    log.info("🔄 [PINNACLE] Snapshot 23h30")
+    try:
+        today = today_kinshasa()
+        data = load_predictions(today)
+        matches = data.get("matches", {})
+        
+        if not matches:
+            log.info("[PINNACLE] Pas de matchs")
+            return
+        
+        # Filtrer score >= 5.5
+        candidates = {mid: m for mid, m in matches.items() if m.get("score", 0) >= 5.5}
+        
+        if not candidates:
+            log.info(f"[PINNACLE] Aucun match score >= 5.5 (sur {len(matches)})")
+            return
+        
+        log.info(f"[PINNACLE] {len(candidates)} matchs score >= 5.5")
+        
+        pinnacle_updated = 0
+        for mid, pred in candidates.items():
+            home = pred.get("home", "")
+            away = pred.get("away", "")
+            league_id = pred.get("league_id")
+            
+            try:
+                pinnacle = pinnapi_client.find_fixture_odds(home, away, league_id=league_id)
+                if pinnacle and pinnacle.get("over_2_5"):
+                    pred["cote_pinnacle_over"] = pinnacle["over_2_5"]
+                    pred["pinnacle_status"] = "available"
+                    pinnacle_updated += 1
+                else:
+                    pred["pinnacle_status"] = "pending"
+            except Exception as e:
+                log.debug(f"[PINNACLE] {home} vs {away} : {e}")
+        
+        save_predictions(data, today)
+        log.info(f"[PINNACLE] {pinnacle_updated}/{len(candidates)} mis à jour")
+    except Exception as e:
+        log.error(f"[PINNACLE] Erreur : {e}")
+
 
 
 
@@ -465,6 +550,15 @@ scheduler.add_job(job_analyse_quotidienne, CronTrigger(hour=23, minute=58),
                   id="analyse_quotidienne", replace_existing=True, misfire_grace_time=3600)
 scheduler.add_job(job_refresh_cotes, IntervalTrigger(minutes=30),
                   id="refresh_cotes", replace_existing=True, misfire_grace_time=600)
+
+# Snapshot Pinnacle 23h30 (matchs score >= 5.5)
+scheduler.add_job(
+    job_snapshot_pinnacle,
+    CronTrigger(hour=23, minute=30),
+    id="snapshot_pinnacle",
+    replace_existing=True,
+    misfire_grace_time=1800
+)
 scheduler.add_job(job_verifier_resultats, CronTrigger(hour=4, minute=0),
                   id="verification_resultats", replace_existing=True, misfire_grace_time=3600)
 
@@ -846,10 +940,43 @@ def cron_trigger(job_id):
         t = threading.Thread(target=job_verifier_resultats, args=(target,), daemon=True)
         t.start()
         return jsonify({"success": True, "job": "verif"})
+    if job_id == "pinnacle":
+        job_snapshot_pinnacle()
+        return jsonify({"success": True, "job": "pinnacle"})
     return jsonify({"success": False, "error": "unknown job"}), 404
 
 
 # ========== MAIN ==========
+
+@app.route("/api/match/<int:match_id>")
+def api_match_detail(match_id):
+    """Retourne les détails d'un match (depuis Neon, pas Bzzoiro)."""
+    try:
+        from src.db import load_predictions
+        from datetime import date, timedelta
+        
+        today = date.today()
+        # Chercher dans les 7 derniers jours
+        for days_back in range(0, 8):
+            d = today - timedelta(days=days_back)
+            data = load_predictions(d)
+            prediction = data.get("matches", {}).get(str(match_id)) or data.get("matches", {}).get(match_id)
+            if prediction:
+                return jsonify({
+                    "match": prediction,
+                    "lineups": prediction.get("lineups"),
+                    "top_players": prediction.get("top_players"),
+                    "home_position": prediction.get("home_position"),
+                    "away_position": prediction.get("away_position"),
+                    "weather": prediction.get("weather"),
+                })
+        
+        return jsonify({"error": "match introuvable"}), 404
+    except Exception as e:
+        log.error(f"[API MATCH] Erreur {match_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     log.info(f"🚀 Kenny Football v1.3.1 sur http://0.0.0.0:{port}")

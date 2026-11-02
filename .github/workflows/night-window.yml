@@ -2,56 +2,71 @@ name: Night Window + Multi-snapshots
 
 on:
   schedule:
-    # 00h05 UTC (01h05 Kinshasa) — juste après le reset Render de minuit UTC
+    # 00h05 UTC — réveil post-reset Render
     - cron: '5 0 * * *'
-    # 17h00 UTC (18h00 Kinshasa) — premier snapshot cotes soir
+    # 17h00 UTC — snapshot Bzzoiro 1
     - cron: '0 17 * * *'
-    # 20h00 UTC (21h00 Kinshasa) — deuxième snapshot
+    # 20h00 UTC — snapshot Bzzoiro 2
     - cron: '0 20 * * *'
-    # 22h30 UTC (23h30 Kinshasa) — troisième snapshot (cotes finales)
+    # 22h00 UTC — snapshot Bzzoiro 3
+    - cron: '0 22 * * *'
+    # 22h30 UTC — snapshot Bzzoiro 4 (cotes finales)
     - cron: '30 22 * * *'
-    # 23h55 UTC (00h55 Kinshasa) — réveil nuit pour analyse
+    # 23h00 UTC — snapshot Bzzoiro 5
+    - cron: '0 23 * * *'
+    # 23h30 UTC — Pinnacle (matchs score >= 5.5)
+    - cron: '30 23 * * *'
+    # 23h55 UTC — réveil nuit
     - cron: '55 23 * * *'
-    # 04h05 UTC (05h05 Kinshasa) — vérification résultats
+    # 04h05 UTC — vérification résultats
     - cron: '5 4 * * *'
   workflow_dispatch:
 
 jobs:
-  # === Réveil post-reset + rattrapage analyse ===
   reset-wakeup:
     if: github.event.schedule == '5 0 * * *'
     runs-on: ubuntu-latest
     steps:
-      - name: Wake Render + trigger analyse
+      - name: Wake Render + analyse
         run: |
-          echo "🕛 Réveil post-reset Render (00h05 UTC)"
-          # Ping de réveil
+          echo "🕛 Réveil post-reset Render"
           curl -s -o /dev/null -w "Wake : HTTP %{http_code}\n" \
             https://kenny-football.onrender.com/api/health
-          sleep 60  # Attendre le cold start (1 min)
-          # Le rattrapage dans app.py a déjà lancé l'analyse si nécessaire
-          # On vérifie juste que l'API répond
+          sleep 60
           curl -s -o /dev/null -w "Health final : HTTP %{http_code}\n" \
             https://kenny-football.onrender.com/api/health
 
-  # === Snapshots cotes (17h, 20h, 22h30) ===
   snapshots:
     if: |
       github.event.schedule == '0 17 * * *' ||
       github.event.schedule == '0 20 * * *' ||
-      github.event.schedule == '30 22 * * *'
+      github.event.schedule == '0 22 * * *' ||
+      github.event.schedule == '30 22 * * *' ||
+      github.event.schedule == '0 23 * * *'
     runs-on: ubuntu-latest
     steps:
-      - name: Wake + refresh cotes
+      - name: Wake + refresh cotes Bzzoiro
         run: |
-          echo "🌆 Snapshot cotes"
+          echo "🌆 Snapshot Bzzoiro"
           curl -s -o /dev/null -w "Wake : HTTP %{http_code}\n" \
             https://kenny-football.onrender.com/api/health
           sleep 10
           curl -s -X POST -o /dev/null -w "Refresh : HTTP %{http_code}\n" \
             https://kenny-football.onrender.com/api/cron/trigger/refresh
 
-  # === Réveil nuit (23h55 UTC) ===
+  pinnacle-snapshot:
+    if: github.event.schedule == '30 23 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake + Pinnacle (score >= 5.5)
+        run: |
+          echo "🎯 Pinnacle snapshot"
+          curl -s -o /dev/null -w "Wake : HTTP %{http_code}\n" \
+            https://kenny-football.onrender.com/api/health
+          sleep 10
+          curl -s -X POST -o /dev/null -w "Pinnacle : HTTP %{http_code}\n" \
+            https://kenny-football.onrender.com/api/cron/trigger/pinnacle
+
   night-wakeup:
     if: github.event.schedule == '55 23 * * *'
     runs-on: ubuntu-latest
@@ -65,7 +80,6 @@ jobs:
           curl -s -X POST -o /dev/null -w "Analyse : HTTP %{http_code}\n" \
             https://kenny-football.onrender.com/api/analyze/start
 
-  # === Vérification résultats (04h05 UTC) ===
   results-check:
     if: github.event.schedule == '5 4 * * *'
     runs-on: ubuntu-latest
