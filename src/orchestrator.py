@@ -385,15 +385,15 @@ class MatchPipeline:
             if edge is None:
                 signal_strength = "rejected"
                 signal_reasons.append("pas de cote Over valide")
-            elif (ensemble.score >= 6.0 and proba_over >= 0.65 
-                and edge >= 0.08 and ensemble.confidence >= 0.60):
+            elif (ensemble.score >= 5.0 and proba_over >= 0.55 
+                and edge >= 0.10 and ensemble.confidence >= 0.55):
                 signal_strength = "strong"
                 signal_reasons.append(f"score {ensemble.score:.2f} + edge {edge:.2f}")
-            elif (ensemble.score >= 5.5 and proba_over >= 0.60 
-                  and edge >= 0.05 and ensemble.confidence >= 0.55):
+            elif (ensemble.score >= 4.5 and proba_over >= 0.50 
+                  and edge >= 0.08 and ensemble.confidence >= 0.50):
                 signal_strength = "medium"
                 signal_reasons.append(f"score {ensemble.score:.2f} + edge {edge:.2f}")
-            elif (ensemble.score >= 5.0 and proba_over >= 0.55 and edge >= 0.03):
+            elif (ensemble.score >= 4.0 and proba_over >= 0.45 and edge >= 0.05):
                 signal_strength = "weak"
                 signal_reasons.append("signal faible")
             else:
@@ -405,8 +405,8 @@ class MatchPipeline:
                 mise = round(1000 * edge * 0.08, 2)
                 mise = min(mise, 25.0)
             elif signal_strength == "medium":
-                mise = round(1000 * edge * 0.03, 2)
-                mise = min(mise, 10.0)
+                mise = round(1000 * edge * 0.05, 2)
+                mise = min(mise, 15.0)
             elif signal_strength == "weak":
                 mise = round(1000 * edge * 0.03, 2)
                 mise = min(mise, 10.0)
