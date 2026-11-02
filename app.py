@@ -997,59 +997,6 @@ def api_match_detail(match_id):
 # ========== CACHE LOGOS API-FOOTBALL ==========
 _team_logo_cache = {}
 
-@app.route('/api/team-logo')
-def api_team_logo():
-    """Récupère le logo d'une équipe via API-Football (avec cache)."""
-    import os as _os, requests as _requests
-    from flask import request, jsonify
-
-    name = request.args.get('name', '').strip()
-    if not name:
-        return jsonify({'error': 'name manquant'}), 400
-
-    # Cache mémoire
-    if name.lower() in _team_logo_cache:
-        return jsonify(_team_logo_cache[name.lower()])
-
-    api_key = _os.environ.get('API_FOOTBALL_KEY')
-    if not api_key:
-        return jsonify({'logo': None, 'error': 'API key manquante'}), 200
-
-    try:
-        r = _requests.get(
-            "https://v3.football.api-sports.io/teams",
-            params={"search": name},
-            headers={"x-apisports-key": api_key},
-            timeout=8,
-        )
-        if r.status_code == 200:
-            data = r.json()
-            if data.get('response'):
-                # Filtrer les équipes réserves (II, B, Reserve, U19, etc.)
-                exclude_suffixes = [' ii', ' b', ' reserve', ' u19', ' u21', ' u23', ' women', ' féminin', ' feminin']
-
-                def is_main_team(t):
-                    n = (t.get('name') or '').lower().strip()
-                    return not any(n.endswith(s) or n == s.strip() for s in exclude_suffixes)
-
-                teams = [item['team'] for item in data['response']]
-                main_teams = [t for t in teams if is_main_team(t)]
-                team = main_teams[0] if main_teams else teams[0]
-
-                result = {
-                    'logo': team.get('logo'),
-                    'name': team.get('name'),
-                    'api_football_id': team.get('id'),
-                }
-                _team_logo_cache[name.lower()] = result
-                log.info(f"[LOGO] {name} -> {result['name']} ({result['api_football_id']})")
-                return jsonify(result)
-    except Exception as e:
-        log.warning(f"[LOGO] {name}: {e}")
-
-    return jsonify({'logo': None})
-
-
 
 @app.route('/api/match-lineup/<int:match_id>')
 def api_match_lineup(match_id):
@@ -1149,6 +1096,7 @@ def api_match_lineup(match_id):
         result_players = []
         for i, p in enumerate(players):
             result_players.append({
+                'id': p.get('id'),  # Bzzoiro player_id pour les photos
                 'name': p.get('name'),
                 'short_name': p.get('short_name'),
                 'position': p.get('position', 'M'),
@@ -1208,6 +1156,30 @@ def api_match_teams(match_id):
     except Exception as e:
         log.warning(f"[MATCH-TEAMS] {match_id}: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+
+# ========== LOGOS & PHOTOS (Bzzoiro direct, team_id/player_id) ==========
+@app.route('/api/team-logo')
+def api_team_logo():
+    """Logo d'équipe via Bzzoiro (team_id)."""
+    from flask import request, jsonify
+    team_id = request.args.get('id')
+    if not team_id:
+        return jsonify({'logo': None, 'error': 'id manquant'}), 400
+    logo_url = f"https://sports.bzzoiro.com/img/team/{team_id}/"
+    return jsonify({'logo': logo_url, 'source': 'bzzoiro'})
+
+
+@app.route('/api/player-photo')
+def api_player_photo():
+    """Photo joueur via Bzzoiro (player_id)."""
+    from flask import request, jsonify
+    player_id = request.args.get('id')
+    if not player_id:
+        return jsonify({'photo': None, 'error': 'id manquant'}), 400
+    photo_url = f"https://sports.bzzoiro.com/img/player/{player_id}/"
+    return jsonify({'photo': photo_url, 'source': 'bzzoiro'})
 
 
 if __name__ == "__main__":
