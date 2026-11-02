@@ -1174,6 +1174,42 @@ def api_match_lineup(match_id):
     })
 
 
+
+@app.route('/api/match-teams/<int:match_id>')
+def api_match_teams(match_id):
+    """Récupère les team_id Bzzoiro pour un match (via l'API Bzzoiro)."""
+    from flask import jsonify
+    import os as _os, requests as _requests
+    
+    api_key = _os.environ.get('BZZOIRO_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'BZZOIRO_API_KEY manquante'}), 500
+    
+    try:
+        # Récupérer l'événement via Bzzoiro
+        r = _requests.get(
+            f"https://api.bzzoiro.com/events/{match_id}/",
+            headers={"Authorization": f"Token {api_key}"},
+            timeout=10,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            # Bzzoiro renvoie parfois {"results": [...]} ou directement un dict
+            event = data.get('results', [{}])[0] if isinstance(data, dict) and 'results' in data else data
+            return jsonify({
+                'match_id': match_id,
+                'home_team_id': event.get('home_team_id'),
+                'away_team_id': event.get('away_team_id'),
+                'home_team': event.get('home_team'),
+                'away_team': event.get('away_team'),
+            })
+        else:
+            return jsonify({'error': f'Bzzoiro HTTP {r.status_code}'}), 500
+    except Exception as e:
+        log.warning(f"[MATCH-TEAMS] {match_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     log.info(f"🚀 Kenny Football v1.3.1 sur http://0.0.0.0:{port}")

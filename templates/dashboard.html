@@ -888,7 +888,16 @@
                 document.getElementById('modal-content').innerHTML = html;
                 
                 // Charger les logos en async
-                loadTeamLogos(m.home, m.away);
+                // Récupérer les team_id Bzzoiro puis charger les logos
+                (async () => {
+                    try {
+                        const r = await fetch('/api/match-teams/' + m.match_id);
+                        if (r.ok) {
+                            const ids = await r.json();
+                            loadTeamLogos(ids.home_team_id, ids.away_team_id, m.home, m.away);
+                        }
+                    } catch (e) { console.warn('match-teams:', e); }
+                })();
                 loadStarPlayers(data.top_players, m.home, m.away);
                 if (m.match_id) loadMatchLineup(m.match_id, 'pitch-container');
                 if (m.match_id) loadMatchLineup(m.match_id, 'pitch-container');
@@ -1004,37 +1013,24 @@
                 const players = topPlayers[side] || [];
                 if (players.length === 0) continue;
                 const star = players[0];
-                const teamName = side === 'home' ? homeName : awayName;
-                try {
-                    const r = await fetch('/api/player-photo?name=' + encodeURIComponent(star.name) + '&team=' + encodeURIComponent(teamName));
-                    if (!r.ok) continue;
-                    const d = await r.json();
-                    if (d.photo) {
-                        const el = document.getElementById('star-card-' + side);
-                        if (el) {
-                            el.innerHTML = '<img src="' + d.photo + '" class="star-card-photo" alt="' + star.name + '" />';
-                        }
+                if (star.id) {
+                    const el = document.getElementById('star-card-' + side);
+                    if (el) {
+                        el.innerHTML = '<img src="https://sports.bzzoiro.com/img/player/' + star.id + '/?sor=true" class="star-card-photo" alt="' + (star.name || '') + '" />';
                     }
-                } catch (e) {}
+                }
             }
         }
 
-        async function loadTeamLogos(homeName, awayName) {
+        async function loadTeamLogos(homeId, awayId, homeName, awayName) {
             try {
-                const [rH, rA] = await Promise.all([
-                    fetch('/api/team-logo?name=' + encodeURIComponent(homeName)),
-                    fetch('/api/team-logo?name=' + encodeURIComponent(awayName))
-                ]);
-                const dH = rH.ok ? await rH.json() : {};
-                const dA = rA.ok ? await rA.json() : {};
-                
-                if (dH.logo) {
+                if (homeId) {
                     const el = document.getElementById('home-avatar');
-                    if (el) el.innerHTML = '<img src="' + dH.logo + '" class="w-14 h-14 object-contain p-2" alt="' + homeName + '" />';
+                    if (el) el.innerHTML = '<img src="https://sports.bzzoiro.com/img/team/' + homeId + '/?bg=transparent" class="w-14 h-14 object-contain p-2" alt="' + (homeName || '') + '" />';
                 }
-                if (dA.logo) {
+                if (awayId) {
                     const el = document.getElementById('away-avatar');
-                    if (el) el.innerHTML = '<img src="' + dA.logo + '" class="w-14 h-14 object-contain p-2" alt="' + awayName + '" />';
+                    if (el) el.innerHTML = '<img src="https://sports.bzzoiro.com/img/team/' + awayId + '/?bg=transparent" class="w-14 h-14 object-contain p-2" alt="' + (awayName || '') + '" />';
                 }
             } catch (e) {
                 console.warn('Logos indisponibles:', e);
