@@ -527,6 +527,7 @@ class MatchPipeline:
                             total_minutes = sum(s.get("minutes_played", 0) or 0 for s in results_stats)
                             player_score = total_goals * 2 + total_xg * 1.5 + total_assists + (total_minutes / 90) * 0.5
                             player_stats.append({
+                                "id": pid,
                                 "name": p.get("name", "?"),
                                 "position": p.get("position", "?"),
                                 "goals": total_goals,
