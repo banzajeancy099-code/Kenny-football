@@ -329,19 +329,113 @@
 
         /* === VUE TERRAIN === */
         .pitch {
-            background: repeating-linear-gradient(
-                0deg,
-                #15803d 0px,
-                #15803d 40px,
-                #166534 40px,
-                #166534 80px
-            );
+            background: 
+                /* Surfaces de réparation (haut et bas) */
+                linear-gradient(180deg, 
+                    transparent 0%, 
+                    transparent 5%,
+                    rgba(255,255,255,0.15) 5%,
+                    rgba(255,255,255,0.15) 6%,
+                    transparent 6%,
+                    transparent 25%,
+                    rgba(255,255,255,0.15) 25%,
+                    rgba(255,255,255,0.15) 26%,
+                    transparent 26%,
+                    transparent 74%,
+                    rgba(255,255,255,0.15) 74%,
+                    rgba(255,255,255,0.15) 75%,
+                    transparent 75%,
+                    transparent 94%,
+                    rgba(255,255,255,0.15) 94%,
+                    rgba(255,255,255,0.15) 95%,
+                    transparent 95%
+                ),
+                repeating-linear-gradient(
+                    0deg,
+                    #15803d 0px,
+                    #15803d 40px,
+                    #166534 40px,
+                    #166534 80px
+                );
             border-radius: 12px;
             padding: 20px 8px;
             position: relative;
             overflow: hidden;
-            border: 2px solid rgba(255,255,255,0.15);
+            border: 2px solid rgba(255,255,255,0.2);
             box-shadow: inset 0 0 60px rgba(0,0,0,0.3);
+        }
+        .pitch::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(255,255,255,0.4);
+            z-index: 0;
+        }
+        .pitch::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
+            background: transparent;
+            z-index: 0;
+        }
+        /* Surface de réparation haut */
+        .pitch-surface-top {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50%;
+            height: 15%;
+            border: 2px solid rgba(255,255,255,0.35);
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            z-index: 0;
+        }
+        /* Surface de réparation bas */
+        .pitch-surface-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50%;
+            height: 15%;
+            border: 2px solid rgba(255,255,255,0.35);
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            z-index: 0;
+        }
+        /* Point de penalty haut */
+        .pitch-penalty-top {
+            position: absolute;
+            top: 8%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            z-index: 0;
+        }
+        /* Point de penalty bas */
+        .pitch-penalty-bottom {
+            position: absolute;
+            bottom: 8%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            z-index: 0;
         }
         .pitch::before {
             content: '';
@@ -817,7 +911,7 @@
                     <div class="flex items-baseline justify-between gap-3 mb-2">
                         <div class="text-sm font-bold text-white truncate">${m.home} <span class="text-neutral-500 font-normal">vs</span> ${m.away}</div>
                         <div class="text-right shrink-0">
-                            <div class="text-[9px] text-neutral-500 uppercase tracking-widest">Score</div>
+                            <div class="text-[9px] text-neutral-500 uppercase tracking-widest">VS</div>
                             <div class="mono text-sm font-extrabold text-white score-value ${(m.score || 0) >= 6 ? 'high' : ''}">${parseFloat(m.score || 0).toFixed(2)}</div>
                         </div>
                     </div>
@@ -980,6 +1074,10 @@
                 }
                 
                 let html = '<div class="pitch">';
+                html += '<div class="pitch-surface-top"></div>';
+                html += '<div class="pitch-surface-bottom"></div>';
+                html += '<div class="pitch-penalty-top"></div>';
+                html += '<div class="pitch-penalty-bottom"></div>';
                 html += renderPitchTeam(data.home, 'home');
                 html += renderPitchTeam(data.away, 'away');
                 html += '</div>';
