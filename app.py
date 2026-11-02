@@ -1224,9 +1224,9 @@ def api_player_photo_custom():
 
 @app.route('/api/player-photo-fotmob')
 def api_player_photo_fotmob():
-    """Récupère une photo via FotMob (gratuit, mais non officiel)."""
+    """Récupère une photo via FotMob (avec retry + cache DB)."""
     from flask import request, jsonify
-    from src.clients.fotmob_client import find_player_photo, get_image
+    from src.clients.fotmob_client import find_player_photo, direct_image_url
     from src.db import get_conn
     
     player_name = request.args.get('name', '').strip()
@@ -1235,17 +1235,30 @@ def api_player_photo_fotmob():
     if not player_name:
         return jsonify({'photo': None, 'error': 'name requis'}), 400
     
-    # 1. Chercher le joueur sur FotMob
+    # 1. Vérifier le cache DB d'abord (rapide)
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT photo_url, player_name FROM player_photos_custom
+                    WHERE LOWER(player_name) = LOWER(%s)
+                    LIMIT 1
+                """, (player_name,))
+                row = cur.fetchone()
+                if row and row[0] and 'imgur.com/XXXXX' not in row[0]:
+                    return jsonify({'photo': row[0], 'name': row[1], 'source': 'cache'})
+    except Exception:
+        pass
+    
+    # 2. Chercher sur FotMob
     player = find_player_photo(player_name, team_name)
     if not player:
-        return jsonify({'photo': None, 'error': 'joueur non trouvé'}), 200
+        return jsonify({'photo': None, 'error': 'joueur non trouvé sur FotMob'}), 200
     
-    # 2. Générer l'URL photo
-    photo_url = get_image(player['id'])
-    if not photo_url:
-        return jsonify({'photo': None, 'error': 'photo non disponible'}), 200
+    # 3. Construire l'URL directe (pas besoin d'appeler get_image)
+    photo_url = direct_image_url(player['id'])
     
-    # 3. Cacher en DB (pour éviter les appels répétés)
+    # 4. Cacher en DB
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -1255,7 +1268,7 @@ def api_player_photo_fotmob():
                     ON CONFLICT (player_id) DO UPDATE SET
                         player_name = EXCLUDED.player_name,
                         photo_url = EXCLUDED.photo_url
-                """, (player['id'], player['name'], team_name, photo_url))
+                """, (int(player['id']), player['name'], team_name, photo_url))
             conn.commit()
     except Exception as e:
         log.warning(f"[FOTMOB CACHE] {e}")
@@ -1266,6 +1279,7 @@ def api_player_photo_fotmob():
         'team': player.get('team'),
         'source': 'fotmob',
     })
+
 
 
 if __name__ == "__main__":
