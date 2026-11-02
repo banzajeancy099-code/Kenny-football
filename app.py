@@ -993,6 +993,52 @@ def api_match_detail(match_id):
         return jsonify({"error": str(e)}), 500
 
 
+
+# ========== CACHE LOGOS API-FOOTBALL ==========
+_team_logo_cache = {}
+
+@app.route('/api/team-logo')
+def api_team_logo():
+    """Récupère le logo d'une équipe via API-Football (avec cache)."""
+    import os as _os, requests as _requests
+    from flask import request, jsonify
+    
+    name = request.args.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'name manquant'}), 400
+    
+    if name.lower() in _team_logo_cache:
+        return jsonify(_team_logo_cache[name.lower()])
+    
+    api_key = _os.environ.get('API_FOOTBALL_KEY')
+    if not api_key:
+        return jsonify({'logo': None, 'error': 'API key manquante'}), 200
+    
+    try:
+        r = _requests.get(
+            "https://v3.football.api-sports.io/teams",
+            params={"search": name},
+            headers={"x-apisports-key": api_key},
+            timeout=8,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if data.get('response'):
+                team = data['response'][0]['team']
+                result = {
+                    'logo': team.get('logo'),
+                    'name': team.get('name'),
+                    'api_football_id': team.get('id'),
+                }
+                _team_logo_cache[name.lower()] = result
+                log.info(f"[LOGO] {name} -> {result['logo']}")
+                return jsonify(result)
+    except Exception as e:
+        log.warning(f"[LOGO] {name}: {e}")
+    
+    return jsonify({'logo': None})
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     log.info(f"🚀 Kenny Football v1.3.1 sur http://0.0.0.0:{port}")

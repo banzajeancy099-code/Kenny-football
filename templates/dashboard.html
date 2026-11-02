@@ -323,6 +323,9 @@
         .tab-active .tab-icon {
             animation: bounceIn 0.4s ease-out;
         }
+
+        summary::-webkit-details-marker { display: none; }
+        details[open] > summary span:first-child { transform: rotate(90deg); display: inline-block; }
 </style>
 </head>
 <body>
@@ -643,11 +646,23 @@
                 html += '<div class="bg-bg/50 rounded-lg p-3 text-center"><div class="text-[9px] text-neutral-500 uppercase">Temp.</div><div class="mono text-sm font-bold text-white mt-1">' + (weather.temperature_c || '?') + '°C</div></div>';
                 html += '</div>';
                 
-                // Score
-                html += '<div class="bg-bg/50 rounded-lg p-4 text-center">';
-                html += '<div class="text-[9px] text-neutral-500 uppercase">Score global</div>';
-                html += '<div class="mono text-3xl font-extrabold text-accent mt-1">' + (m.score || 0).toFixed(2) + '</div>';
-                html += '<div class="mt-2">' + signalBadge(m.signal_strength) + '</div>';
+                // Score + équipes
+                html += '<div class="bg-bg/50 rounded-lg p-4">';
+                html += '  <div class="flex items-center justify-between gap-2">';
+                html += '    <div class="flex flex-col items-center flex-1 min-w-0">';
+                html += '      <div class="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center text-lg font-bold text-white" id="home-avatar">' + (m.home || '?').substring(0, 2).toUpperCase() + '</div>';
+                html += '      <div class="text-xs font-bold text-white mt-2 text-center leading-tight">' + (m.home || '?') + '</div>';
+                html += '    </div>';
+                html += '    <div class="flex flex-col items-center px-2">';
+                html += '      <div class="mono text-3xl font-extrabold text-accent">' + (m.score || 0).toFixed(2) + '</div>';
+                html += '      <div class="text-[9px] text-neutral-500 uppercase">Score</div>';
+                html += '      <div class="mt-1">' + signalBadge(m.signal_strength) + '</div>';
+                html += '    </div>';
+                html += '    <div class="flex flex-col items-center flex-1 min-w-0">';
+                html += '      <div class="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center text-lg font-bold text-white" id="away-avatar">' + (m.away || '?').substring(0, 2).toUpperCase() + '</div>';
+                html += '      <div class="text-xs font-bold text-white mt-2 text-center leading-tight">' + (m.away || '?') + '</div>';
+                html += '    </div>';
+                html += '  </div>';
                 html += '</div>';
                 
                 // Top joueurs
@@ -675,6 +690,9 @@
                 html += '</div></div>';
                 
                 document.getElementById('modal-content').innerHTML = html;
+                
+                // Charger les logos en async
+                loadTeamLogos(m.home, m.away);
             } catch (e) {
                 document.getElementById('modal-content').innerHTML = '<div class="text-center text-danger p-4">Erreur: ' + e.message + '</div>';
             }
@@ -682,6 +700,28 @@
 
         function closeModal() {
             document.getElementById('match-modal').classList.add('hidden');
+        }
+
+        async function loadTeamLogos(homeName, awayName) {
+            try {
+                const [rH, rA] = await Promise.all([
+                    fetch('/api/team-logo?name=' + encodeURIComponent(homeName)),
+                    fetch('/api/team-logo?name=' + encodeURIComponent(awayName))
+                ]);
+                const dH = rH.ok ? await rH.json() : {};
+                const dA = rA.ok ? await rA.json() : {};
+                
+                if (dH.logo) {
+                    const el = document.getElementById('home-avatar');
+                    if (el) el.innerHTML = '<img src="' + dH.logo + '" class="w-14 h-14 object-contain" alt="' + homeName + '" />';
+                }
+                if (dA.logo) {
+                    const el = document.getElementById('away-avatar');
+                    if (el) el.innerHTML = '<img src="' + dA.logo + '" class="w-14 h-14 object-contain" alt="' + awayName + '" />';
+                }
+            } catch (e) {
+                console.warn('Logos indisponibles:', e);
+            }
         }
 
 async function loadHome() {
@@ -736,6 +776,15 @@ async function loadHome() {
             historyData.forEach(d => {
                 let matches = d.matches || [];
 
+                // Filtrer selon marché actif
+                if (currentMarket === 'over') {
+                    matches = matches.filter(m => (m.mise_kelly || 0) > 0);
+                } else if (currentMarket === 'under') {
+                    matches = matches.filter(m => (m.mise_under || 0) > 0);
+                } else if (currentMarket === 'btts') {
+                    matches = matches.filter(m => (m.mise_btts || 0) > 0);
+                }
+                
                 // Filtrer selon historyFilter
                 if (historyFilter === 'correct') {
                     matches = matches.filter(m => m.result_verdict === '✓');
@@ -748,16 +797,19 @@ async function loadHome() {
                 const correct = matches.filter(m => m.result_verdict === '✓').length;
                 const wrong = matches.filter(m => m.result_verdict === '×').length;
 
-                html += `<div class="mb-4">
-                    <div class="flex items-center justify-between mb-2 px-1">
-                        <div class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">${d.date || ''}</div>
+                html += `<details class="mb-3 group" open>
+                    <summary class="flex items-center justify-between mb-2 px-1 cursor-pointer list-none hover:opacity-80 transition">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-neutral-600 transition-transform inline-block">▶</span>
+                            <div class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">${d.date || ''}</div>
+                        </div>
                         <div class="mono text-xs">
                             <span class="text-accent font-bold">${correct}✓</span>
                             <span class="text-danger font-bold ml-2">${wrong}×</span>
                         </div>
-                    </div>
+                    </summary>
                     ${renderMatchesCard(matches)}
-                </div>`;
+                </details>`;
             });
 
             if (html === '') {
