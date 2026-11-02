@@ -620,7 +620,71 @@
             </div>`;
         }
 
-        async function loadHome() {
+                // ========== MODALE MATCH ==========
+        async function openMatch(matchId) {
+            document.getElementById('match-modal').classList.remove('hidden');
+            document.getElementById('modal-content').innerHTML = '<div class="loading-shimmer h-40 rounded-lg"></div>';
+            
+            try {
+                const r = await fetch('/api/match/' + matchId);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                const m = data.match || {};
+                
+                document.getElementById('modal-title').textContent = (m.home || '?') + ' vs ' + (m.away || '?');
+                
+                const weather = data.weather || {};
+                let html = '';
+                
+                // En-tête
+                html += '<div class="grid grid-cols-3 gap-2 text-sm">';
+                html += '<div class="bg-bg/50 rounded-lg p-3 text-center"><div class="text-[9px] text-neutral-500 uppercase">Heure</div><div class="mono text-sm font-bold text-white mt-1">' + (m.kickoff || '').slice(11, 16) + '</div></div>';
+                html += '<div class="bg-bg/50 rounded-lg p-3 text-center"><div class="text-[9px] text-neutral-500 uppercase">Météo</div><div class="text-sm font-bold text-white mt-1">' + (weather.description || '—') + '</div></div>';
+                html += '<div class="bg-bg/50 rounded-lg p-3 text-center"><div class="text-[9px] text-neutral-500 uppercase">Temp.</div><div class="mono text-sm font-bold text-white mt-1">' + (weather.temperature_c || '?') + '°C</div></div>';
+                html += '</div>';
+                
+                // Score
+                html += '<div class="bg-bg/50 rounded-lg p-4 text-center">';
+                html += '<div class="text-[9px] text-neutral-500 uppercase">Score global</div>';
+                html += '<div class="mono text-3xl font-extrabold text-accent mt-1">' + (m.score || 0).toFixed(2) + '</div>';
+                html += '<div class="mt-2">' + signalBadge(m.signal_strength) + '</div>';
+                html += '</div>';
+                
+                // Top joueurs
+                const topPlayers = data.top_players || {};
+                for (const side of ['home', 'away']) {
+                    const players = topPlayers[side] || [];
+                    if (players.length === 0) continue;
+                    const teamName = side === 'home' ? m.home : m.away;
+                    html += '<div><div class="text-[10px] text-neutral-500 uppercase mb-2">⭐ Top joueurs — ' + teamName + '</div><div class="space-y-1">';
+                    players.forEach((p, i) => {
+                        html += '<div class="flex justify-between items-center bg-bg/30 rounded-lg p-2 text-sm">';
+                        html += '<span class="font-bold text-white">' + (i+1) + '. ' + p.name + '</span>';
+                        html += '<span class="mono text-xs text-accent">' + p.goals + '⚽ · ' + p.xg + ' xG</span>';
+                        html += '</div>';
+                    });
+                    html += '</div></div>';
+                }
+                
+                // Classements
+                const homeP = data.home_position || {};
+                const awayP = data.away_position || {};
+                html += '<div><div class="text-[10px] text-neutral-500 uppercase mb-2">🏆 Classements</div><div class="space-y-1">';
+                html += '<div class="flex justify-between items-center bg-bg/30 rounded-lg p-2 text-sm"><span class="font-bold text-white">' + m.home + '</span><span class="mono text-accent">' + (homeP.position || '?') + 'e (' + (homeP.points || '?') + ' pts)</span></div>';
+                html += '<div class="flex justify-between items-center bg-bg/30 rounded-lg p-2 text-sm"><span class="font-bold text-white">' + m.away + '</span><span class="mono text-accent">' + (awayP.position || '?') + 'e (' + (awayP.points || '?') + ' pts)</span></div>';
+                html += '</div></div>';
+                
+                document.getElementById('modal-content').innerHTML = html;
+            } catch (e) {
+                document.getElementById('modal-content').innerHTML = '<div class="text-center text-danger p-4">Erreur: ' + e.message + '</div>';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('match-modal').classList.add('hidden');
+        }
+
+async function loadHome() {
             const el = document.getElementById('home-content');
             document.getElementById('home-count').textContent = '';
             if (currentMarket === '1x2') { el.innerHTML = renderComingSoon('1X2 (victoire/nul/défaite)'); return; }
