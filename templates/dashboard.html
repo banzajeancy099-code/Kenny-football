@@ -536,20 +536,28 @@
         .pitch-row {
             display: flex;
             justify-content: center;
-            gap: 6px;
-            margin: 8px 0;
-            flex-wrap: wrap;
+            gap: 10px;
+            margin: 14px 0;
+            flex-wrap: nowrap;
+            padding: 0 4px;
+        }
+        .pitch-row:first-child {
+            margin-top: 4px;
+        }
+        .pitch-row:last-child {
+            margin-bottom: 4px;
         }
         .pitch-player {
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-width: 50px;
-            max-width: 60px;
+            min-width: 42px;
+            max-width: 52px;
+            flex: 0 1 auto;
         }
         .pitch-player-avatar {
-            width: 42px;
-            height: 42px;
+            width: 38px;
+            height: 38px;
             border-radius: 50%;
             background: rgba(0,0,0,0.5);
             border: 2px solid rgba(255,255,255,0.3);
@@ -573,12 +581,12 @@
             border: 1px solid rgba(255,255,255,0.2);
         }
         .pitch-player-name {
-            font-size: 9px;
+            font-size: 8px;
             color: white;
-            margin-top: 4px;
+            margin-top: 3px;
             text-align: center;
             line-height: 1.1;
-            max-width: 60px;
+            max-width: 52px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -1034,16 +1042,8 @@
                 document.getElementById('modal-content').innerHTML = html;
                 
                 // Charger les logos en async
-                // Récupérer les team_id Bzzoiro puis charger les logos
-                (async () => {
-                    try {
-                        const r = await fetch('/api/match-teams/' + m.match_id);
-                        if (r.ok) {
-                            const ids = await r.json();
-                            loadTeamLogos(ids.home_team_id, ids.away_team_id, m.home, m.away);
-                        }
-                    } catch (e) { console.warn('match-teams:', e); }
-                })();
+                // Charger les logos directement depuis match_data (IDs Bzzoiro)
+                loadTeamLogos(m.home_team_id, m.away_team_id, m.home, m.away);
                 loadStarPlayers(data.top_players, m.home, m.away);
                 if (m.match_id) loadMatchLineup(m.match_id, 'pitch-container');
                 if (m.match_id) loadMatchLineup(m.match_id, 'pitch-container');
