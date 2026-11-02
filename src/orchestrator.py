@@ -315,13 +315,13 @@ class MatchPipeline:
                 else:
                     if signal == "strong":
                         mise = round(1000 * edge_over_pinnacle * 0.15, 2)
-                        mise = min(mise, 50.0)
+                        mise = min(mise, 25.0)
                     elif signal == "medium":
                         mise = round(1000 * edge_over_pinnacle * 0.10, 2)
-                        mise = min(mise, 30.0)
+                        mise = min(mise, 10.0)
                     else:
                         mise = round(1000 * edge_over_pinnacle * 0.05, 2)
-                        mise = min(mise, 15.0)
+                        mise = min(mise, 10.0)
                     result["mise_kelly"] = mise
             else:
                 result["pinnacle_status"] = "pending"
@@ -402,14 +402,14 @@ class MatchPipeline:
 
             # ===== 3. Mise adaptative =====
             if signal_strength == "strong":
-                mise = round(1000 * edge * 0.15, 2)
-                mise = min(mise, 50.0)
+                mise = round(1000 * edge * 0.08, 2)
+                mise = min(mise, 25.0)
             elif signal_strength == "medium":
-                mise = round(1000 * edge * 0.10, 2)
-                mise = min(mise, 30.0)
+                mise = round(1000 * edge * 0.03, 2)
+                mise = min(mise, 10.0)
             elif signal_strength == "weak":
-                mise = round(1000 * edge * 0.05, 2)
-                mise = min(mise, 15.0)
+                mise = round(1000 * edge * 0.03, 2)
+                mise = min(mise, 10.0)
 
         retenu = signal_strength in ("strong", "medium")
 
@@ -490,7 +490,7 @@ class MatchPipeline:
             edge_under = proba_under * cote_under - 1
             if edge_under >= 0.05:
                 is_under_bet = True
-                mise_under = min(1000 * edge_under * 0.05, 15.0)
+                mise_under = min(1000 * edge_under * 0.03, 10.0)
                 log.info(f"[UNDER] {home} · bet=True · edge={edge_under:.2f} · mise={mise_under:.2f}€ · cote={cote_under} · L46={l46_score:.1f}")
         elif cote_under is not None and l46_score < 3.0:
             log.info(f"[UNDER] {home} · SKIP · L46={l46_score:.1f} (marché opposé)")
