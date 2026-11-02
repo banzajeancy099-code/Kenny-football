@@ -1165,11 +1165,39 @@
                 const players = topPlayers[side] || [];
                 if (players.length === 0) continue;
                 const star = players[0];
-                if (star.id) {
-                    const el = document.getElementById('star-card-' + side);
-                    if (el) {
-                        el.innerHTML = '<img src="https://sports.bzzoiro.com/img/player/' + star.id + '/?sor=true" class="star-card-photo" alt="' + (star.name || '') + '" />';
+                const teamName = side === 'home' ? homeName : awayName;
+                const el = document.getElementById('star-card-' + side);
+                if (!el) continue;
+                
+                // 1. Essayer photo custom (DB)
+                try {
+                    const url = '/api/player-photo-custom?id=' + (star.id || '') + '&name=' + encodeURIComponent(star.name || '');
+                    const r = await fetch(url);
+                    if (r.ok) {
+                        const d = await r.json();
+                        if (d.photo) {
+                            el.innerHTML = '<img src="' + d.photo + '" class="star-card-photo" alt="' + (star.name || '') + '" />';
+                            continue;
+                        }
                     }
+                } catch (e) {}
+                
+                // 2. Fallback FotMob (auto)
+                try {
+                    const url2 = '/api/player-photo-fotmob?name=' + encodeURIComponent(star.name || '') + '&team=' + encodeURIComponent(teamName);
+                    const r2 = await fetch(url2);
+                    if (r2.ok) {
+                        const d2 = await r2.json();
+                        if (d2.photo) {
+                            el.innerHTML = '<img src="' + d2.photo + '" class="star-card-photo" alt="' + (star.name || '') + '" />';
+                            continue;
+                        }
+                    }
+                } catch (e) {}
+                
+                // 3. Fallback Bzzoiro
+                if (star.id) {
+                    el.innerHTML = '<img src="https://sports.bzzoiro.com/img/player/' + star.id + '/' + '" class="star-card-photo" alt="' + (star.name || '') + '" onerror="this.style.display=\'none\'" />';
                 }
             }
         }

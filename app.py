@@ -1182,6 +1182,92 @@ def api_player_photo():
     return jsonify({'photo': photo_url, 'source': 'bzzoiro'})
 
 
+
+@app.route('/api/player-photo-custom')
+def api_player_photo_custom():
+    """Récupère une photo custom (Imgur) par nom de joueur ou player_id."""
+    from flask import request, jsonify
+    from src.db import get_conn
+    
+    player_id = request.args.get('id')
+    player_name = request.args.get('name', '').strip()
+    
+    if not player_id and not player_name:
+        return jsonify({'photo': None, 'error': 'id ou name requis'}), 400
+    
+    with get_conn() as conn:
+        if conn is None:
+            return jsonify({'photo': None, 'error': 'DB indisponible'}), 500
+        try:
+            with conn.cursor() as cur:
+                if player_id:
+                    cur.execute("""
+                        SELECT photo_url, player_name FROM player_photos_custom
+                        WHERE player_id = %s
+                        LIMIT 1
+                    """, (player_id,))
+                else:
+                    cur.execute("""
+                        SELECT photo_url, player_name FROM player_photos_custom
+                        WHERE LOWER(player_name) = LOWER(%s)
+                        LIMIT 1
+                    """, (player_name,))
+                row = cur.fetchone()
+                if row:
+                    return jsonify({'photo': row[0], 'name': row[1], 'source': 'custom'})
+                return jsonify({'photo': None, 'source': 'custom'})
+        except Exception as e:
+            log.warning(f"[PHOTO-CUSTOM] {e}")
+            return jsonify({'photo': None, 'error': str(e)}), 500
+
+
+
+@app.route('/api/player-photo-fotmob')
+def api_player_photo_fotmob():
+    """Récupère une photo via FotMob (gratuit, mais non officiel)."""
+    from flask import request, jsonify
+    from src.clients.fotmob_client import find_player_photo, get_image
+    from src.db import get_conn
+    
+    player_name = request.args.get('name', '').strip()
+    team_name = request.args.get('team', '').strip()
+    
+    if not player_name:
+        return jsonify({'photo': None, 'error': 'name requis'}), 400
+    
+    # 1. Chercher le joueur sur FotMob
+    player = find_player_photo(player_name, team_name)
+    if not player:
+        return jsonify({'photo': None, 'error': 'joueur non trouvé'}), 200
+    
+    # 2. Générer l'URL photo
+    photo_url = get_image(player['id'])
+    if not photo_url:
+        return jsonify({'photo': None, 'error': 'photo non disponible'}), 200
+    
+    # 3. Cacher en DB (pour éviter les appels répétés)
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO player_photos_custom (player_id, player_name, team_name, photo_url)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (player_id) DO UPDATE SET
+                        player_name = EXCLUDED.player_name,
+                        photo_url = EXCLUDED.photo_url
+                """, (player['id'], player['name'], team_name, photo_url))
+            conn.commit()
+    except Exception as e:
+        log.warning(f"[FOTMOB CACHE] {e}")
+    
+    return jsonify({
+        'photo': photo_url,
+        'name': player['name'],
+        'team': player.get('team'),
+        'source': 'fotmob',
+    })
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     log.info(f"🚀 Kenny Football v1.3.1 sur http://0.0.0.0:{port}")
