@@ -1004,7 +1004,7 @@
             let statusBadge = '';
             if (isWon) statusBadge = '<span class="text-lg">✅</span>';
             else if (isLost) statusBadge = '<span class="text-lg">❌</span>';
-            else if (isLive) statusBadge = '<span class="badge badge-live">● LIVE</span>';
+            else if (isLive) statusBadge = '<span class="badge badge-live">● LIVE</span>' + (m.home_score != null && m.away_score != null ? ' <span class="mono text-[10px] font-bold text-red-400">' + m.home_score + '-' + m.away_score + '</span>' : '');
             else if (isFuture) statusBadge = '<span class="badge badge-soon">⏳ À venir</span>';
 
             // Formater l'heure (extrait HH:MM)
@@ -1017,7 +1017,7 @@
             }
 
             return `
-                <div class="match-row" onclick="openMatch(${m.match_id})">
+                <div class="match-row" data-market-type="match" onclick="openMatch(${m.match_id})">
                     <div class="match-header">
                         <div class="flex items-center gap-2 min-w-0">${signalBadge(m.signal_strength)} ${statusBadge}</div>
                         <div class="flex items-center gap-2">
@@ -1161,6 +1161,33 @@
             } catch (e) {
                 document.getElementById('modal-content').innerHTML = '<div class="text-center text-danger p-4">Erreur: ' + e.message + '</div>';
             }
+        }
+
+        function filterByMarket(market) {
+            // Toggle active sur les boutons
+            document.querySelectorAll('.market-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.market === market);
+            });
+            
+            // Filtrer les cards
+            const cards = document.querySelectorAll('[data-market-type]');
+            let visible = 0;
+            cards.forEach(card => {
+                let show = false;
+                if (market === 'all') show = true;
+                else if (market === 'over') show = card.dataset.miseOver > 0;
+                else if (market === 'under') show = card.dataset.miseUnder > 0;
+                else if (market === 'btts') show = card.dataset.miseBtts > 0;
+                else if (market === '1x2') show = false;
+                else if (market === 'paris-jour') {
+                    show = (parseFloat(card.dataset.miseOver) > 0 || parseFloat(card.dataset.miseUnder) > 0);
+                }
+                card.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            
+            const empty = document.getElementById('empty-filter');
+            if (empty) empty.style.display = visible === 0 ? 'block' : 'none';
         }
 
         function closeModal() {

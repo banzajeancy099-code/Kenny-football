@@ -106,7 +106,8 @@ def prefilter(match: dict) -> bool:
     if lid not in TARGET_LEAGUES:
         return False
     status = str(match.get("status") or "").lower()
-    if status != "notstarted":
+    # Accepter les matchs en cours (pour l'affichage) mais pas pour le pari
+    if status not in ("notstarted", "live", "halftime", "1st_half", "2nd_half"):
         return False
     h2h = match.get("head_to_head") or {}
     if isinstance(h2h, dict):
@@ -597,6 +598,9 @@ class MatchPipeline:
             "home_team_id": match.get("home_team_id"),
             "away_team_id": match.get("away_team_id"),
             "away": away,
+            "home_score": match.get("home_score"),
+            "away_score": match.get("away_score"),
+            "status": match.get("status"),
             "league_id": league_id,
             "league_name": league_name,
             "kickoff": match.get("kickoff") or match.get("event_date") or match.get("date"),
