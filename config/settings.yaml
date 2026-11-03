@@ -4,45 +4,98 @@ app:
   port: 3000
 
 leagues:
+  # === Grandes ligues européennes ===
+  premier_league:
+    id: 1
+    over_rate: 0.55
+  la_liga:
+    id: 3
+    over_rate: 0.53
+  serie_a_italy:
+    id: 4
+    over_rate: 0.55
   bundesliga:
     id: 5
     over_rate: 0.635
+  ligue_1:
+    id: 6
+    over_rate: 0.58
+  champions_league:
+    id: 7
+    over_rate: 0.58
+  europa_league:
+    id: 8
+    over_rate: 0.56
   eredivisie:
     id: 10
     over_rate: 0.617
+  primeira_liga_pt:
+    id: 2
+    over_rate: 0.55
+  pro_league_be:
+    id: 14
+    over_rate: 0.58
   super_league_ch:
     id: 15
     over_rate: 0.78
-  eliteserien:
-    id: 54
-    over_rate: 0.622
+  super_lig_tr:
+    id: 11
+    over_rate: 0.56
+  championship:
+    id: 12
+    over_rate: 0.54
+  austrian_bundesliga:
+    id: 96
+    over_rate: 0.60
+  serie_b_italy:
+    id: 100
+    over_rate: 0.56
+  bundesliga_2:
+    id: 94
+    over_rate: 0.58
+  ligue_2:
+    id: 89
+    over_rate: 0.52
+  la_liga_2:
+    id: 38
+    over_rate: 0.54
+  # === Autres ligues ===
+  brasileirao_serie_a:
+    id: 9
+    over_rate: 0.55
+  brasileirao_serie_b:
+    id: 34
+    over_rate: 0.50
+  argentina_primera:
+    id: 85
+    over_rate: 0.50
   mls:
     id: 18
     over_rate: 0.587
   liga_mx:
     id: 19
     over_rate: 0.554
-  premier_league:
-    id: 1
-    over_rate: 0.55
-  brasileirao_serie_a:
-    id: 9
-    over_rate: 0.55
-  serie_a_italy:
-    id: 4
-    over_rate: 0.55
-  ligue_1:
-    id: 6
+  eliteserien:
+    id: 54
+    over_rate: 0.622
+  allsvenskan:
+    id: 26
     over_rate: 0.58
-  championship:
-    id: 12
-    over_rate: 0.54
-  pro_league_be:
-    id: 14
+  superliga_dk:
+    id: 84
     over_rate: 0.58
-  austrian_bundesliga:
-    id: 96
-    over_rate: 0.60
+  ekstraklasa:
+    id: 25
+    over_rate: 0.56
+  saudi_pro_league:
+    id: 17
+    over_rate: 0.58
+  efl_league_one:
+    id: 97
+    over_rate: 0.55
+  scottish_premiership:
+    id: 16
+    over_rate: 0.58
 
 thresholds:
   score_min: 8.0

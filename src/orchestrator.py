@@ -141,7 +141,9 @@ def prefilter(match: dict) -> bool:
                 cote_under = odds.get("under_25_goals")
                 
                 # Accepter le match si Over OU Under a une cote valide
-                over_valid = (cote_over is not None and 1.35 <= cote_over <= 2.50)
+                # Accepter les cotes très basses (1.10-1.35) pour les gros favoris
+                min_cote = 1.10 if (proba_over or 0) >= 0.65 else 1.35
+                over_valid = (cote_over is not None and min_cote <= cote_over <= 2.50)
                 under_valid = (cote_under is not None and 1.50 <= cote_under <= 2.00)
                 
                 if not over_valid and not under_valid:
@@ -314,14 +316,14 @@ class MatchPipeline:
                     result["warnings"].append(f"Pinnacle: edge {edge_over_pinnacle:+.2%} insuffisant")
                 else:
                     if signal == "strong":
-                        mise = round(1000 * edge_over_pinnacle * 0.15, 2)
-                        mise = min(mise, 25.0)
+                        mise = round(1000 * edge_over_pinnacle * 0.05, 2)
+                        mise = min(mise, 15.0)
                     elif signal == "medium":
-                        mise = round(1000 * edge_over_pinnacle * 0.10, 2)
+                        mise = round(1000 * edge_over_pinnacle * 0.03, 2)
                         mise = min(mise, 10.0)
                     else:
-                        mise = round(1000 * edge_over_pinnacle * 0.05, 2)
-                        mise = min(mise, 10.0)
+                        mise = round(1000 * edge_over_pinnacle * 0.02, 2)
+                        mise = min(mise, 5.0)
                     result["mise_kelly"] = mise
             else:
                 result["pinnacle_status"] = "pending"
@@ -352,7 +354,9 @@ class MatchPipeline:
         # Si pas de cote Bzzoiro, on utilise un fallback pour l'edge initial
         # Le vrai edge sera recalculé avec Pinnacle dans run_with_pinnacle
         # Vérifier si Over est exploitable
-        over_valid = (cote_over is not None and 1.35 <= cote_over <= 2.50)
+        # Accepter les cotes très basses (1.10-1.35) pour les gros favoris
+        min_cote = 1.10 if (proba_over or 0) >= 0.65 else 1.35
+        over_valid = (cote_over is not None and min_cote <= cote_over <= 2.50)
         
         # Calculer l'edge Over (seulement si cote valide)
         edge = proba_over * cote_over - 1 if over_valid else None
@@ -381,8 +385,12 @@ class MatchPipeline:
             if l45_score < 3.0:
                 signal_reasons.append(f"L45={l45_score:.1f} (contre le marché)")
         else:
-            # ===== 2. Signaux FORT / MOYEN / FAIBLE =====
-            if edge is None:
+            # ===== BASCULE UNDER si signaux négatifs forts =====
+            if (l31_score < 4.0 or l35_score < 4.0):
+                signal_strength = "rejected"
+                signal_reasons.append(f"signaux négatifs forts (L31={l31_score:.1f}, L35={l35_score:.1f}) → bascule Under")
+                # On laisse le bloc Under s'exécuter plus bas
+            elif edge is None:
                 signal_strength = "rejected"
                 signal_reasons.append("pas de cote Over valide")
             elif (ensemble.score >= 5.0 and proba_over >= 0.55 
@@ -407,14 +415,14 @@ class MatchPipeline:
 
             # ===== 3. Mise adaptative =====
             if signal_strength == "strong":
-                mise = round(1000 * edge * 0.08, 2)
-                mise = min(mise, 25.0)
-            elif signal_strength == "medium":
-                mise = round(1000 * edge * 0.05, 2)
-                mise = min(mise, 15.0)
-            elif signal_strength == "weak":
                 mise = round(1000 * edge * 0.03, 2)
                 mise = min(mise, 10.0)
+            elif signal_strength == "medium":
+                mise = round(1000 * edge * 0.02, 2)
+                mise = min(mise, 5.0)
+            elif signal_strength == "weak":
+                mise = round(1000 * edge * 0.02, 2)
+                mise = min(mise, 5.0)
 
         retenu = signal_strength in ("strong", "medium")
 
