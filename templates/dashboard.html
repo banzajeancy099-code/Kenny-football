@@ -913,7 +913,7 @@
                         <div class="flex items-center gap-2 min-w-0">${signalBadge(m.signal_strength)} ${statusBadge}</div>
                         <div class="flex items-center gap-2">
                             ${timeStr ? `<span class="match-time">${timeStr}</span>` : ''}
-                            ${m.result_verdict ? `<span class="mono text-[10px] text-neutral-400">${m.result_home_score ?? '?'}-${m.result_away_score ?? '?'}</span>` : ''}
+                            ${m.result_verdict ? `<span class="mono text-[10px] text-neutral-400">${(m.result && m.result.home_score != null) ? m.result.home_score : '?'}-${(m.result && m.result.away_score != null) ? m.result.away_score : '?'}</span>` : ''}
                         </div>
                     </div>
                     <div class="flex items-baseline justify-between gap-3 mb-2">

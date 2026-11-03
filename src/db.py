@@ -378,7 +378,7 @@ def get_archive(limit=90):
                 cur2.execute("""
                     SELECT home, away, score, result_verdict,
                            mise_kelly, mise_under, cote_over, cote_under,
-                           proba_over, edge, is_under_bet
+                           proba_over, edge, is_under_bet, result
                     FROM predictions
                     WHERE date = %s AND result_verdict IS NOT NULL
                     ORDER BY score DESC
@@ -400,6 +400,7 @@ def get_archive(limit=90):
                         "proba_over": float(m[8]) if m[8] is not None else None,
                         "edge": float(m[9]) if m[9] is not None else None,
                         "is_under_bet": m[10],
+                        "result": m[11],  # dict avec home_score, away_score
                     })
 
                 out.append({
