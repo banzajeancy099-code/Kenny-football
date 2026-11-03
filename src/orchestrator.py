@@ -397,7 +397,7 @@ class MatchPipeline:
                 signal_strength = "strong"
                 signal_reasons.append(f"score {ensemble.score:.2f} + edge {edge:.2f}")
             elif (ensemble.score >= 4.5 and proba_over >= 0.50 
-                  and edge >= 0.10 and ensemble.confidence >= 0.50):
+                  and edge >= 0.07 and ensemble.confidence >= 0.50):
                 signal_strength = "medium"
                 signal_reasons.append(f"score {ensemble.score:.2f} + edge {edge:.2f}")
             # Bonus : gros favoris (proba >= 70%) même avec edge faible
@@ -405,7 +405,7 @@ class MatchPipeline:
                   and edge >= 0.00 and ensemble.confidence >= 0.50):
                 signal_strength = "medium"
                 signal_reasons.append(f"gros favori (proba {proba_over:.2f}) + edge {edge:.2f}")
-            elif (ensemble.score >= 4.0 and proba_over >= 0.45 and edge >= 0.08):
+            elif (ensemble.score >= 4.0 and proba_over >= 0.45 and edge >= 0.05):
                 signal_strength = "weak"
                 signal_reasons.append("signal faible")
             else:
