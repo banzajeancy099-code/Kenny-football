@@ -1286,3 +1286,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     log.info(f"🚀 Kenny Football v1.3.1 sur http://0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)
+# Force rebuild Tue Nov  3 23:09:35 WAT 2026
