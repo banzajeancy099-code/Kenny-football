@@ -699,6 +699,8 @@
         .signal-rejected { background: rgba(239,68,68,0.2); color: #ef4444; }
         .signal-medium { background: rgba(251,191,36,0.2); color: #fbbf24; }
         .signal-strong { background: rgba(74,222,128,0.2); color: #4ade80; }
+        .signal-medium_nocote { background: rgba(168,85,247,0.2); color: #a855f7; }
+        .signal-weak_nocote { background: rgba(234,179,8,0.2); color: #eab308; }
 
         /* Terrain V2 */
         .pitch-pro {
@@ -1142,6 +1144,19 @@
                 // Vue terrain (compositions)
                 html += '<div id="pitch-container"></div>';
                 
+                // Signaux Under (si L47 a des warnings)
+                const l47 = (m.layers || {}).get("47");
+                const l47_warnings = (m.layers_warnings || {}).get("47") || [];
+                if (l47 !== undefined && l47_warnings.length > 0) {
+                    html += '<div class="bg-bg/50 rounded-lg p-3">';
+                    html += '<div class="text-[10px] text-neutral-500 uppercase mb-2">🔻 Signaux Under (L47 = ' + l47.toFixed(1) + ')</div>';
+                    html += '<div class="space-y-1">';
+                    l47_warnings.forEach(w => {
+                        html += '<div class="text-xs text-blue-400">✓ ' + w + '</div>';
+                    });
+                    html += '</div></div>';
+                }
+
                 // Classements
                 const homeP = data.home_position || {};
                 const awayP = data.away_position || {};

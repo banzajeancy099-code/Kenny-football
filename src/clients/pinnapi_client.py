@@ -15,6 +15,8 @@ LEAGUE_MAP = {
     4: "soccer_italy_serie_a",
     5: "soccer_germany_bundesliga",
     6: "soccer_france_ligue_one",
+    7: "soccer_uefa_champs_league",
+    8: "soccer_uefa_europa_league",
     9: "soccer_brazil_campeonato",
     10: "soccer_netherlands_eredivisie",
     11: "soccer_turkey_super_league",

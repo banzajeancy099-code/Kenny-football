@@ -31,6 +31,8 @@ from src.layers.l42_split_performance import SplitPerformanceLayer
 from src.layers.l44_profile import ProfileLayer
 from src.layers.l45_market_consensus import MarketConsensusLayer
 from src.layers.l46_under_market import UnderMarketLayer
+from src.layers.l47_under_score import UnderScoreLayer
+from src.layers.l48_player_context import PlayerContextLayer
 from src.layers.l34_context_enjeu import ContextEnjeuLayer
 from src.scoring import BayesianScorer
 
@@ -149,8 +151,9 @@ def prefilter(match: dict) -> bool:
                 if not over_valid and not under_valid:
                     return True  # ← accepte les matchs sans cote (Pinnacle fera le fallback)
         except Exception:
-            # Si on ne peut pas récupérer la cote, on rejette le match
-            return False
+            # Si on ne peut pas récupérer la cote, on accepte le match
+            # (le fallback Pinnacle fera le travail dans run_with_pinnacle)
+            return True
 
     return True
 
@@ -227,6 +230,8 @@ class MatchPipeline:
             MarketConsensusLayer(bzzoiro),
             UnderMarketLayer(bzzoiro),
             ContextEnjeuLayer(bzzoiro),
+            UnderScoreLayer(bzzoiro),
+            PlayerContextLayer(bzzoiro),
         ]
         self.scorer = BayesianScorer(weights)
 
@@ -294,6 +299,11 @@ class MatchPipeline:
                 result["edge_pinnacle"] = round(edge_over_pinnacle, 4)
                 result["cote_pinnacle_over"] = cote_over_pinnacle
                 result["pinnacle_status"] = "available"
+
+                # Si le signal actuel est "weak_nocote" ou "medium_nocote", on le garde
+                # (Pinnacle ne doit pas écraser ces signaux)
+                if result.get("signal_strength") in ("weak_nocote", "medium_nocote"):
+                    return result
 
                 # Recalculer le signal avec edge Pinnacle
                 proba = result.get("proba_over", 0.5)
@@ -431,7 +441,25 @@ class MatchPipeline:
                 mise = round(1000 * edge * 0.02, 2)
                 mise = min(mise, 5.0)
 
-        retenu = signal_strength in ("strong", "medium")
+        # === PARI SANS COTE (NOUVEAU) ===
+        # Ne s'applique QUE si aucun autre signal n'a été trouvé (signal_strength == "rejected")
+        # ET que la cote est trop basse (< 1.15) ou absente
+        if signal_strength == "rejected" and (cote_over is None or cote_over < 1.15):
+            score_val = ensemble.score
+            if score_val >= 6.5:
+                signal_strength = "medium_nocote"
+                mise = 2.0
+                signal_reasons.append(f"Pari sans cote (score {score_val:.2f}) - Signal FORT")
+            elif score_val >= 5.5:
+                signal_strength = "weak_nocote"
+                mise = 1.0
+                signal_reasons.append(f"Pari sans cote (score {score_val:.2f}) - Signal MOYEN")
+            else:
+                signal_strength = "rejected"
+                mise = 0.0
+                signal_reasons.append("Pas de cote et score insuffisant")
+
+        retenu = signal_strength in ("strong", "medium", "medium_nocote")
 
         # ===== 4. Score BTTS =====
         l25 = layers_dict.get("25", 5.0)
@@ -501,12 +529,15 @@ class MatchPipeline:
 
         # Vérifier L46 (marché orienté Under ou pas)
         l46_score = layers_dict.get("46", 5.0)
+        l47_score = layers_dict.get("47", 5.0)
         
         if (cote_under is not None
-            and 1.50 <= cote_under <= 2.00
-            and score_final_under < 4.8
+            and 1.40 <= cote_under <= 2.10
+            and l47_score >= 5.5
             and l46_score >= 3.0):
-            proba_under = _score_to_proba_under(ensemble.score)
+            # Utiliser L47 (Under Score) au lieu de _score_to_proba_under
+            l47_score = layers_dict.get("47", 5.0)
+            proba_under = min(0.95, max(0.05, l47_score / 10.0))
             edge_under = proba_under * cote_under - 1
             if edge_under >= 0.05:
                 is_under_bet = True
