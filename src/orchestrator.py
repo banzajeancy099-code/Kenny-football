@@ -146,7 +146,7 @@ def prefilter(match: dict) -> bool:
                 under_valid = (cote_under is not None and 1.50 <= cote_under <= 2.00)
                 
                 if not over_valid and not under_valid:
-                    return False
+                    return True  # ← accepte les matchs sans cote (Pinnacle fera le fallback)
         except Exception:
             # Si on ne peut pas récupérer la cote, on rejette le match
             return False
@@ -265,8 +265,9 @@ class MatchPipeline:
         # 1. Run normal (Bzzoiro)
         result = self.run(match)
 
-        # 2. Si score trop bas, pas la peine de chercher Pinnacle
-        if result.get("score", 0) < 5.0:
+        # 2. Si score trop bas ET pas de cote, on tente Pinnacle quand même
+        # (les gros matchs ont souvent un score bas à cause des cotes basses)
+        if result.get("score", 0) < 5.0 and result.get("cote_over") is not None:
             return result
 
         # 3. Si L31 rejette (match à éviter), pas la peine
@@ -388,7 +389,13 @@ class MatchPipeline:
             if (l31_score < 4.0 or l35_score < 4.0):
                 signal_strength = "rejected"
                 signal_reasons.append(f"signaux négatifs forts (L31={l31_score:.1f}, L35={l35_score:.1f}) → bascule Under")
-                # On laisse le bloc Under s'exécuter plus bas
+                
+                # TA RÈGLE : Si les signaux sont négatifs ET que l'Under ne prend pas le relais
+                # On rejette immédiatement sans chercher de cote (économise Pinnacle)
+                # Note: is_under_bet et mise_under sont définis plus bas, donc on met un flag
+                # qu'on vérifiera après le calcul de l'Under
+                # (On ne peut pas vérifier is_under_bet ici car il n'est pas encore calculé)
+                
             elif edge is None:
                 signal_strength = "rejected"
                 signal_reasons.append("pas de cote Over valide")
@@ -397,7 +404,7 @@ class MatchPipeline:
                 signal_strength = "strong"
                 signal_reasons.append(f"score {ensemble.score:.2f} + edge {edge:.2f}")
             elif (ensemble.score >= 4.5 and proba_over >= 0.50 
-                  and edge >= 0.07 and ensemble.confidence >= 0.50):
+                  and edge >= 0.10 and ensemble.confidence >= 0.50):
                 signal_strength = "medium"
                 signal_reasons.append(f"score {ensemble.score:.2f} + edge {edge:.2f}")
             # Bonus : gros favoris (proba >= 70%) même avec edge faible
@@ -405,7 +412,7 @@ class MatchPipeline:
                   and edge >= 0.00 and ensemble.confidence >= 0.50):
                 signal_strength = "medium"
                 signal_reasons.append(f"gros favori (proba {proba_over:.2f}) + edge {edge:.2f}")
-            elif (ensemble.score >= 4.0 and proba_over >= 0.45 and edge >= 0.05):
+            elif (ensemble.score >= 4.0 and proba_over >= 0.45 and edge >= 0.08):
                 signal_strength = "weak"
                 signal_reasons.append("signal faible")
             else:
@@ -503,6 +510,14 @@ class MatchPipeline:
             if edge_under >= 0.05:
                 is_under_bet = True
                 mise_under = min(1000 * edge_under * 0.03, 10.0)
+            else:
+                # TA RÈGLE : Si on est ici, c'est que l'Under n'est pas rentable
+                # Si le signal Over était "rejected" à cause des signaux négatifs (L31/L35 < 4.0)
+                # Alors on rejette définitivement le match (mise = 0)
+                if (l31_score < 4.0 or l35_score < 4.0):
+                    signal_strength = "rejected"
+                    signal_reasons.append("Signaux négatifs + Under non rentable → rejet définitif")
+                    mise = 0.0
                 log.info(f"[UNDER] {home} · bet=True · edge={edge_under:.2f} · mise={mise_under:.2f}€ · cote={cote_under} · L46={l46_score:.1f}")
         elif cote_under is not None and l46_score < 3.0:
             log.info(f"[UNDER] {home} · SKIP · L46={l46_score:.1f} (marché opposé)")
