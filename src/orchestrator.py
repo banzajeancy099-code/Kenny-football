@@ -76,7 +76,7 @@ _BZZOIRO_SINGLETON = None
 
 log = logging.getLogger("orchestrator")
 
-TARGET_LEAGUES = {1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 14, 15, 17, 18, 19, 23, 25, 26, 34, 38, 52, 53, 54, 84, 89, 94, 96, 100, 107, 108}
+TARGET_LEAGUES = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 23, 25, 26, 34, 38, 41, 47, 52, 53, 54, 80, 84, 85, 86, 87, 89, 94, 96, 97, 98, 100, 107, 108}
 
 LEAGUES = {
     1: "Premier League", 4: "Serie A", 5: "Bundesliga",
@@ -120,10 +120,9 @@ def prefilter(match: dict) -> bool:
         h2h_total = len(h2h)
     else:
         h2h_total = 0
-    # H2H : accepter les matchs avec au moins 1 confrontation
-    # (3 était trop strict, éliminait 80% des matchs)
-    if h2h_total < 1:
-        return False
+    # H2H : filtre assoupli (accepter même sans H2H)
+    # Les matchs sans H2H sont souvent des coupes ou des premières rencontres
+    # On laisse passer, l'analyse H2H (L3) gérera les cas sans données
 
     # === FILTRE COTE : exclure les matchs sans cote exploitable AVANT l'analyse ===
     # On ne garde que les matchs avec une cote Over 2.5 dans la plage 1.35 - 2.50
