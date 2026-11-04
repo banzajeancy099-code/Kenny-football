@@ -118,6 +118,17 @@ def init_db():
                 cur.execute("""
                     CREATE INDEX IF NOT EXISTS idx_predictions_date ON predictions(date DESC);
                     CREATE INDEX IF NOT EXISTS idx_predictions_verdict ON predictions(result_verdict);
+                    
+                    -- Ajouter les colonnes manquantes (idempotent)
+                    ALTER TABLE predictions ADD COLUMN IF NOT EXISTS signal_strength TEXT;
+                    ALTER TABLE predictions ADD COLUMN IF NOT EXISTS signal_reasons JSONB;
+                    ALTER TABLE predictions ADD COLUMN IF NOT EXISTS retenu BOOLEAN DEFAULT FALSE;
+                    ALTER TABLE predictions ADD COLUMN IF NOT EXISTS cote_under NUMERIC;
+                    ALTER TABLE predictions ADD COLUMN IF NOT EXISTS home_team_id INTEGER;
+                    ALTER TABLE predictions ADD COLUMN IF NOT EXISTS away_team_id INTEGER;
+                    ALTER TABLE predictions ADD COLUMN IF NOT EXISTS home_score INTEGER;
+                    ALTER TABLE predictions ADD COLUMN IF NOT EXISTS away_score INTEGER;
+                    ALTER TABLE predictions ADD COLUMN IF NOT EXISTS status TEXT;
                 """)
             conn.commit()
             log.info("✅ Table predictions prête")
@@ -148,18 +159,21 @@ def save_predictions(d: date, data: dict):
                             date, match_id, match_data, home, away,
                             league_id, league_name, kickoff, score,
                             proba_over, edge, cote_over, mise_kelly,
-                            is_under_bet, proba_under, edge_under, mise_under,
+                            is_under_bet, proba_under, edge_under, mise_under, cote_under,
                             score_btts, cote_btts_yes, edge_btts, mise_btts, retenu_btts,
                             result, result_verdict,
+                            signal_strength, signal_reasons, retenu,
                             pinnacle_status, edge_pinnacle, cote_pinnacle_over,
                             lineups, top_players, home_position, away_position, weather,
+                            home_team_id, away_team_id, home_score, away_score, status,
                             updated_at
                         ) VALUES (
                             %s, %s, %s, %s, %s, %s, %s, %s, %s,
                             %s, %s, %s, %s, %s, %s, %s, %s,
-                            %s, %s, %s, %s, %s,
-                            %s, %s,
+                            %s, %s, %s, %s, %s, %s,
                             %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s,
                             %s, %s, %s, %s, %s,
                             NOW()
                         )
@@ -179,8 +193,12 @@ def save_predictions(d: date, data: dict):
                             edge_btts = EXCLUDED.edge_btts,
                             mise_btts = EXCLUDED.mise_btts,
                             retenu_btts = EXCLUDED.retenu_btts,
+                            cote_under = EXCLUDED.cote_under,
                             result = EXCLUDED.result,
                             result_verdict = EXCLUDED.result_verdict,
+                            signal_strength = EXCLUDED.signal_strength,
+                            signal_reasons = EXCLUDED.signal_reasons,
+                            retenu = EXCLUDED.retenu,
                             pinnacle_status = EXCLUDED.pinnacle_status,
                             edge_pinnacle = EXCLUDED.edge_pinnacle,
                             cote_pinnacle_over = EXCLUDED.cote_pinnacle_over,
@@ -195,10 +213,13 @@ def save_predictions(d: date, data: dict):
                         pred.get("home"), pred.get("away"),
                         pred.get("league_id"), pred.get("league_name"), pred.get("kickoff"), pred.get("score"),
                         pred.get("proba_over"), pred.get("edge"), pred.get("cote_over"), pred.get("mise_kelly"),
-                        pred.get("is_under_bet", False), pred.get("proba_under"), pred.get("edge_under"), pred.get("mise_under"),
+                        pred.get("is_under_bet", False), pred.get("proba_under"), pred.get("edge_under"), pred.get("mise_under"), pred.get("cote_under"),
                         pred.get("score_btts"), pred.get("cote_btts_yes"), pred.get("edge_btts"), pred.get("mise_btts"), pred.get("retenu_btts", False),
                         json.dumps(pred.get("result"), default=str) if pred.get("result") else None,
                         (pred.get("result") or {}).get("verdict") if pred.get("result") else None,
+                        pred.get("signal_strength"),
+                        json.dumps(pred.get("signal_reasons"), default=str) if pred.get("signal_reasons") else None,
+                        pred.get("retenu", False),
                         pred.get("pinnacle_status"),
                         pred.get("edge_pinnacle"),
                         pred.get("cote_pinnacle_over"),
