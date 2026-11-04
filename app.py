@@ -309,11 +309,11 @@ def job_refresh_cotes(force=False):
                             pinnacle_rejected += 1
                         else:
                             if signal == "strong":
-                                mise = min(round(1000 * edge_pin * 0.15, 2), 50.0)
-                            elif signal == "medium":
-                                mise = min(round(1000 * edge_pin * 0.10, 2), 30.0)
-                            else:
                                 mise = min(round(1000 * edge_pin * 0.05, 2), 15.0)
+                            elif signal == "medium":
+                                mise = min(round(1000 * edge_pin * 0.03, 2), 10.0)
+                            else:
+                                mise = min(round(1000 * edge_pin * 0.02, 2), 5.0)
                             pred["mise_kelly"] = mise
                 else:
                     if pred.get("pinnacle_status") != "available":
@@ -719,11 +719,11 @@ def predictions_today():
     for m in active:
         signal = m.get("signal_strength", "medium")
         if signal == "strong":
-            cap = 50.0
-        elif signal == "medium":
-            cap = 30.0
-        elif signal == "weak":
             cap = 15.0
+        elif signal == "medium":
+            cap = 10.0
+        elif signal == "weak":
+            cap = 5.0
         else:  # rejected
             cap = 0.0
         
@@ -734,17 +734,19 @@ def predictions_today():
         if signal == "rejected":
             m["mise_kelly"] = 0.0
             m["mise_btts"] = 0.0
-            m["mise_under"] = 0.0
+            # NE PAS écraser mise_under si le match a un pari Under valide
+            if not m.get("is_under_bet"):
+                m["mise_under"] = 0.0
 
     # Cap ULTIME à la lecture (quoi qu'il arrive)
     for m in active:
         signal = m.get("signal_strength", "medium")
         if signal == "strong":
-            cap = 50.0
-        elif signal == "medium":
-            cap = 30.0
-        elif signal == "weak":
             cap = 15.0
+        elif signal == "medium":
+            cap = 10.0
+        elif signal == "weak":
+            cap = 5.0
         else:
             cap = 0.0
         
@@ -755,7 +757,9 @@ def predictions_today():
         if signal == "rejected":
             m["mise_kelly"] = 0.0
             m["mise_btts"] = 0.0
-            m["mise_under"] = 0.0
+            # NE PAS écraser mise_under si le match a un pari Under valide
+            if not m.get("is_under_bet"):
+                m["mise_under"] = 0.0
 
     retenus_count = sum(
         1 for m in active
