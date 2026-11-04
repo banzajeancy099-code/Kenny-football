@@ -228,6 +228,11 @@ def save_predictions(d: date, data: dict):
                         json.dumps(pred.get("home_position"), default=str) if pred.get("home_position") else None,
                         json.dumps(pred.get("away_position"), default=str) if pred.get("away_position") else None,
                         json.dumps(pred.get("weather"), default=str) if pred.get("weather") else None,
+                        pred.get("home_team_id"),
+                        pred.get("away_team_id"),
+                        pred.get("home_score"),
+                        pred.get("away_score"),
+                        pred.get("status"),
                     ))
             conn.commit()
             return True
