@@ -932,6 +932,117 @@
             padding-top: 8px;
             border-top: 1px solid rgba(255,255,255,0.1);
         }
+
+        /* === PALETTE PRO === */
+        :root {
+            --bg-dark: #0a0a0a;
+            --bg-card: #141414;
+            --bg-card-hover: #1a1a1a;
+            --border-color: #222;
+            --text-main: #e5e5e5;
+            --text-muted: #888;
+            --blue-electric: #007BFF;
+            --red-neon: #EF072A;
+            --green-pro: #22c55e;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #141414, #0a0a0a);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Barre de navigation */
+        .nav-bar, .market-bar {
+            background: rgba(10, 10, 10, 0.95) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            backdrop-filter: blur(12px);
+        }
+        
+        /* Boutons de marché */
+        .market-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+        .market-btn:hover {
+            border-color: var(--blue-electric);
+            color: white;
+        }
+        .market-btn.active {
+            background: rgba(0, 123, 255, 0.15) !important;
+            border-color: var(--blue-electric) !important;
+            color: var(--blue-electric) !important;
+        }
+        
+        /* Bouton "Paris du Jour" */
+        .btn-paris-jour {
+            background: linear-gradient(90deg, var(--blue-electric), #0056b3);
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+        
+        /* Bouton Analyser */
+        .btn-analyze {
+            background: var(--blue-electric);
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        /* Cartes de match */
+        .match-row {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .match-row:hover {
+            background: var(--bg-card-hover);
+            border-color: #333;
+        }
+        
+        /* Indicateur Over/Under (barre latérale) */
+        .match-row[data-mise-over]:not([data-mise-over="0"])::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+            background: var(--blue-electric);
+        }
+        .match-row[data-mise-under]:not([data-mise-under="0"])::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+            background: var(--red-neon);
+        }
+
+        /* Badges */
+        .badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+        .badge-strong { background: rgba(0, 123, 255, 0.2); color: var(--blue-electric); }
+        .badge-weak_nocote { background: rgba(0, 123, 255, 0.2); color: var(--blue-electric); }
+        .badge-medium_nocote { background: rgba(0, 123, 255, 0.2); color: var(--blue-electric); }
+        .badge-rejected { background: rgba(239, 7, 42, 0.2); color: var(--red-neon); }
+
+        /* Vue "Paris du Jour" Plein Écran */
+        #paris-jour-view {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg-dark);
+            z-index: 100;
+            overflow-y: auto;
+            padding: 16px;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .pari-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        .pari-table th { text-align: left; padding: 8px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); }
+        .pari-table td { padding: 8px; font-size: 12px; border-bottom: 1px solid var(--border-color); }
+        .pari-table tr:hover td { background: var(--bg-card-hover); }
+        
+        .pari-total { margin-top: 20px; padding: 16px; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--blue-electric); }
+        .pari-total-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+        .pari-total-row.big { font-size: 18px; font-weight: 800; color: var(--blue-electric); margin-top: 12px; padding-top: 12px; border-top: 1px solid #333; }
+        
+        .btn-return { background: var(--bg-card); border: 1px solid var(--border-color); color: white; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-return:hover { background: var(--border-color); }
 </style>
 </head>
 <body>
@@ -974,7 +1085,7 @@
         </div>
         <!-- Bouton Paris du Jour EN DESSOUS des filtres -->
         <div class="px-4 pt-3 pb-2">
-            <button class="btn-paris-jour w-full" onclick="filterByMarket('paris-jour'); this.classList.add('active');">🎯 Paris du Jour</button>
+            <button class="btn-paris-jour w-full" onclick="openParisJour()">🎯 Paris du Jour</button>
         </div>
             <!-- SCORE BAR (row 2 - conditionnelle) -->
             <div id="score-bar" class="hidden">
@@ -1393,6 +1504,67 @@
             
             const empty = document.getElementById('empty-filter');
             if (empty) empty.style.display = visible === 0 ? 'block' : 'none';
+        }
+
+        
+        function openParisJour() {
+            const el = document.getElementById('paris-jour-view');
+            if (el) el.remove(); // Supprimer si existe déjà
+            
+            const view = document.createElement('div');
+            view.id = 'paris-jour-view';
+            
+            // Récupérer les matchs (on suppose que la variable globale matches existe, sinon on refetch)
+            fetch('/api/predictions')
+                .then(r => r.json())
+                .then(data => {
+                    const allMatches = data.matches || [];
+                    const paris = allMatches.filter(m => (m.mise_kelly || 0) > 0 || (m.mise_under || 0) > 0);
+                    
+                    let totalMise = 0, totalGain = 0;
+                    let rows = '';
+                    
+                    paris.forEach(m => {
+                        const isOver = (m.mise_kelly || 0) > 0;
+                        const mise = isOver ? m.mise_kelly : m.mise_under;
+                        const cote = isOver ? m.cote_over : m.cote_under;
+                        const gain = mise * (cote || 1);
+                        totalMise += mise;
+                        totalGain += gain;
+                        
+                        rows += `<tr>
+                            <td><strong>${m.home}</strong> vs ${m.away}</td>
+                            <td>${isOver ? '<span style="color:var(--blue-electric)">Over</span>' : '<span style="color:var(--red-neon)">Under</span>'}</td>
+                            <td>${cote ? cote.toFixed(2) : '—'}</td>
+                            <td>${mise.toFixed(2)}€</td>
+                            <td style="color:var(--blue-electric)">${gain.toFixed(2)}€</td>
+                        </tr>`;
+                    });
+                    
+                    const miseFC = totalMise * 2300;
+                    const gainFC = totalGain * 2300;
+                    
+                    view.innerHTML = `
+                        <div style="display:flex; align-items:center; margin-bottom:20px;">
+                            <button class="btn-return" onclick="document.getElementById('paris-jour-view').remove()">← Retour</button>
+                            <h2 style="margin-left:16px; font-size:20px; font-weight:800; color:white;">🎯 Paris du Jour</h2>
+                        </div>
+                        
+                        <table class="pari-table">
+                            <thead><tr><th>Match</th><th>Marché</th><th>Cote</th><th>Mise</th><th>Gain</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                        
+                        <div class="pari-total">
+                            <div class="pari-total-row"><span>Nombre de paris</span><strong>${paris.length}</strong></div>
+                            <div class="pari-total-row"><span>Mise totale</span><strong>${miseFC.toLocaleString()} FC</strong></div>
+                            <div class="pari-total-row big"><span>Gain potentiel</span><strong>${gainFC.toLocaleString()} FC</strong></div>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(view);
+                })
+                .catch(e => alert("Erreur: " + e.message));
         }
 
         function closeModal() {
