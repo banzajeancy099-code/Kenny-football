@@ -1361,10 +1361,17 @@
         }
 
         function filterByMarket(market) {
+            // Mettre à jour currentMarket
+            currentMarket = market;
+            
             // Toggle active sur les boutons
             document.querySelectorAll('.market-btn').forEach(b => {
                 b.classList.toggle('active', b.dataset.market === market);
             });
+            
+            // Toggle active sur le bouton Paris du Jour
+            const btnParis = document.querySelector('.btn-paris-jour');
+            if (btnParis) btnParis.classList.toggle('active', market === 'paris-jour');
             
             // Filtrer les cards
             const cards = document.querySelectorAll('[data-market-type]');
@@ -1661,13 +1668,13 @@ async function loadHome() {
                 
                 // Filtrer selon le marché (mises, pas probas)
                 if (currentMarket === 'over') {
-                    matches = matches.filter(m => (m.mise_kelly || 0) > 0);
+                    matches = matches.filter(m => Number(m.mise_kelly || 0) > 0);
                 } else if (currentMarket === 'under') {
-                    matches = matches.filter(m => (m.mise_under || 0) > 0);
+                    matches = matches.filter(m => Number(m.mise_under || 0) > 0);
                 } else if (currentMarket === 'btts') {
-                    matches = matches.filter(m => (m.mise_btts || 0) > 0);
+                    matches = matches.filter(m => Number(m.mise_btts || 0) > 0);
                 } else if (currentMarket === 'paris-jour') {
-                    matches = matches.filter(m => (m.mise_kelly || 0) > 0 || (m.mise_under || 0) > 0);
+                    matches = matches.filter(m => Number(m.mise_kelly || 0) > 0 || Number(m.mise_under || 0) > 0);
                 }
                 // 'all' → tous les matchs
 
@@ -1704,12 +1711,14 @@ async function loadHome() {
             historyData.forEach((d, idx) => {
                 let matches = d.matches || [];
 
-                // Filtre marché
-                if (currentMarket === 'over') matches = matches.filter(m => (m.mise_kelly || 0) > 0);
-                else if (currentMarket === 'under') matches = matches.filter(m => (m.mise_under || 0) > 0);
-                else if (currentMarket === 'btts') matches = matches.filter(m => (m.mise_btts || 0) > 0);
-
+                // Ne garder QUE les paris (mise > 0)
+                matches = matches.filter(m => Number(m.mise_kelly || 0) > 0 || Number(m.mise_under || 0) > 0);
                 if (matches.length === 0) return;
+
+                // Filtre marché
+                if (currentMarket === 'over') matches = matches.filter(m => Number(m.mise_kelly || 0) > 0);
+                else if (currentMarket === 'under') matches = matches.filter(m => Number(m.mise_under || 0) > 0);
+                else if (currentMarket === 'btts') matches = matches.filter(m => Number(m.mise_btts || 0) > 0);
 
                 const correct = matches.filter(m => m.result_verdict === '✓').length;
                 const wrong = matches.filter(m => m.result_verdict === '×').length;
