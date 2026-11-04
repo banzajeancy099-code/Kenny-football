@@ -209,6 +209,11 @@ def save_predictions(d: date, data: dict):
                             home_position = EXCLUDED.home_position,
                             away_position = EXCLUDED.away_position,
                             weather = EXCLUDED.weather,
+                            home_team_id = EXCLUDED.home_team_id,
+                            away_team_id = EXCLUDED.away_team_id,
+                            home_score = EXCLUDED.home_score,
+                            away_score = EXCLUDED.away_score,
+                            status = EXCLUDED.status,
                             updated_at = NOW()
                     """, (
                         d, mid, json.dumps(pred, default=str),
