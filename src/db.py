@@ -154,6 +154,8 @@ def save_predictions(d: date, data: dict):
         try:
             with conn.cursor() as cur:
                 for mid, pred in matches.items():
+                    # LOG DEBUG : voir ce qui est écrit
+                    log.info(f"[SAVE DEBUG] {pred.get('home')} | home_team_id={pred.get('home_team_id')} | status={pred.get('status')} | signal={pred.get('signal_strength')}")
                     cur.execute("""
                         INSERT INTO predictions (
                             date, match_id, match_data, home, away,
