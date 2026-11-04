@@ -278,7 +278,7 @@ def load_predictions(d: date):
                 """SELECT match_id, match_data, result, result_verdict,
                           home_team_id, away_team_id, home_score, away_score,
                           status, signal_strength, signal_reasons, retenu,
-                          cote_under, mise_under, is_under_bet
+                          cote_under, mise_under, is_under_bet, mise_kelly
                    FROM predictions WHERE date = %s""",
                 (d,)
             )
@@ -287,7 +287,7 @@ def load_predictions(d: date):
 
             matches = {}
             for row in rows:
-                match_id, match_data, result, result_verdict, home_team_id, away_team_id, home_score, away_score, status, signal_strength, signal_reasons, retenu, cote_under, mise_under, is_under_bet = row
+                match_id, match_data, result, result_verdict, home_team_id, away_team_id, home_score, away_score, status, signal_strength, signal_reasons, retenu, cote_under, mise_under, is_under_bet, mise_kelly = row
                 data = match_data
                 if isinstance(data, str):
                     data = json.loads(data)
@@ -307,6 +307,7 @@ def load_predictions(d: date):
                 data["cote_under"] = float(cote_under) if cote_under is not None else None
                 data["mise_under"] = float(mise_under) if mise_under is not None else 0.0
                 data["is_under_bet"] = is_under_bet
+                data["mise_kelly"] = float(mise_kelly) if mise_kelly is not None else 0.0
                 matches[match_id] = data
 
             # Cap FORCÉ des mises selon signal
@@ -315,11 +316,13 @@ def load_predictions(d: date):
                     continue
                 signal = m.get("signal_strength", "medium")
                 if signal == "strong":
-                    cap = 50.0
-                elif signal == "medium":
-                    cap = 30.0
-                elif signal == "weak":
                     cap = 15.0
+                elif signal == "medium":
+                    cap = 10.0
+                elif signal == "weak":
+                    cap = 5.0
+                elif signal in ("weak_nocote", "medium_nocote"):
+                    cap = 5.0  # ou 2.0, selon ta préférence
                 else:  # rejected
                     cap = 0.0
                 
@@ -349,7 +352,7 @@ def load_predictions(d: date):
                     SELECT match_id, match_data, result, result_verdict,
                            home_team_id, away_team_id, home_score, away_score,
                            status, signal_strength, signal_reasons, retenu,
-                           cote_under, mise_under, is_under_bet
+                           cote_under, mise_under, is_under_bet, mise_kelly
                     FROM predictions WHERE date = %s
                 """, (d,))
                 rows = cur.fetchall()
@@ -374,6 +377,7 @@ def load_predictions(d: date):
                 data["cote_under"] = float(row["cote_under"]) if row.get("cote_under") is not None else None
                 data["mise_under"] = float(row["mise_under"]) if row.get("mise_under") is not None else 0.0
                 data["is_under_bet"] = row.get("is_under_bet")
+                data["mise_kelly"] = float(row["mise_kelly"]) if row.get("mise_kelly") is not None else 0.0
                 matches[row["match_id"]] = data
 
             # Cap FORCÉ des mises selon signal
@@ -382,11 +386,13 @@ def load_predictions(d: date):
                     continue
                 signal = m.get("signal_strength", "medium")
                 if signal == "strong":
-                    cap = 50.0
-                elif signal == "medium":
-                    cap = 30.0
-                elif signal == "weak":
                     cap = 15.0
+                elif signal == "medium":
+                    cap = 10.0
+                elif signal == "weak":
+                    cap = 5.0
+                elif signal in ("weak_nocote", "medium_nocote"):
+                    cap = 5.0  # ou 2.0, selon ta préférence
                 else:  # rejected
                     cap = 0.0
                 
