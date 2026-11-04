@@ -1578,6 +1578,9 @@
                             <div class="pari-total-row big"><span>Gain potentiel</span><strong>${gainTotalFC.toLocaleString()} FC</strong></div>
                         </div>
                     `;
+                    
+                    // Ajouter la vue au DOM
+                    document.body.appendChild(view);
                 })
                 .catch(e => alert("Erreur: " + e.message));
         }
