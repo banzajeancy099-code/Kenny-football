@@ -1286,6 +1286,37 @@ def api_player_photo_fotmob():
 
 
 
+
+@app.route("/api/paris-du-jour")
+def paris_du_jour():
+    """Renvoie uniquement les matchs à haute probabilité pour le Paris du Jour."""
+    today = today_kinshasa()
+    data = load_predictions(today)
+    matches_dict = data.get("matches") or {}
+    if not isinstance(matches_dict, dict):
+        matches_dict = {}
+
+    paris = []
+    for m in matches_dict.values():
+        if not isinstance(m, dict):
+            continue
+        
+        # Filtre : probabilité élevée ET mise > 0
+        proba_over = m.get("proba_over") or 0
+        proba_under = m.get("proba_under") or 0
+        mise_over = m.get("mise_kelly") or 0
+        mise_under = m.get("mise_under") or 0
+        
+        # On garde si (Over avec proba > 0.65 et mise > 0) OU (Under avec proba > 0.65 et mise > 0)
+        if (mise_over > 0 and proba_over >= 0.60) or (mise_under > 0 and proba_under >= 0.60):
+            paris.append(m)
+    
+    return jsonify({
+        "date": today.isoformat(),
+        "total": len(paris),
+        "matches": paris,
+    })
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     log.info(f"🚀 Kenny Football v1.3.1 sur http://0.0.0.0:{port}")

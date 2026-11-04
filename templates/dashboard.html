@@ -1284,6 +1284,19 @@
             };
             return `<span class="badge badge-${s}">${icons[s] || '?'} ${labels[s] || s.toUpperCase()}</span>`;
         }
+        function getMarketBadge(m) {
+            const isUnder = (m.mise_under || 0) > 0;
+            const isOver = (m.mise_kelly || 0) > 0;
+            
+            if (isUnder) {
+                return `<span class="badge" style="background: rgba(239,7,42,0.2); color: #EF072A;">🎯 UNDER</span>`;
+            }
+            if (isOver) {
+                return `<span class="badge" style="background: rgba(0,123,255,0.2); color: #007BFF;">🎯 OVER</span>`;
+            }
+            return signalBadge(m.signal_strength);
+        }
+
         function fmtMoney(v) { return (v || 0).toFixed(2) + '€'; }
         function edgeColor(v) { return v > 0 ? 'text-accent' : v < 0 ? 'text-danger' : 'text-neutral-400'; }
 
@@ -1315,7 +1328,7 @@
             return `
                 <div class="match-row" data-market-type="match" data-mise-over="${m.mise_kelly || 0}" data-mise-under="${m.mise_under || 0}" data-mise-btts="${m.mise_btts || 0}" onclick="openMatch(${m.match_id})">
                     <div class="match-header">
-                        <div class="flex items-center gap-2 min-w-0">${signalBadge(m.signal_strength)} ${statusBadge}</div>
+                        <div class="flex items-center gap-2 min-w-0">${getMarketBadge(m)} ${statusBadge}</div>
                         <div class="flex items-center gap-2">
                             ${timeStr ? `<span class="match-time">${timeStr}</span>` : ''}
                             ${m.result_verdict ? `<span class="mono text-[10px] text-neutral-400">${(m.result && m.result.home_score != null) ? m.result.home_score : '?'}-${(m.result && m.result.away_score != null) ? m.result.away_score : '?'}</span>` : ''}
@@ -1509,60 +1522,62 @@
         
         function openParisJour() {
             const el = document.getElementById('paris-jour-view');
-            if (el) el.remove(); // Supprimer si existe déjà
-            
+            if (el) el.remove();
+
             const view = document.createElement('div');
             view.id = 'paris-jour-view';
-            
-            // Récupérer les matchs (on suppose que la variable globale matches existe, sinon on refetch)
+
             fetch('/api/predictions')
                 .then(r => r.json())
                 .then(data => {
                     const allMatches = data.matches || [];
-                    const paris = allMatches.filter(m => (m.mise_kelly || 0) > 0 || (m.mise_under || 0) > 0);
-                    
-                    let totalMise = 0, totalGain = 0;
+                    const paris = allMatches.filter(m => 
+                        (Number(m.mise_kelly || 0) > 0) || (Number(m.mise_under || 0) > 0)
+                    );
+
+                    let coteTotale = 1;
                     let rows = '';
-                    
+                    let nbParis = 0;
+
                     paris.forEach(m => {
-                        const isOver = (m.mise_kelly || 0) > 0;
+                        const isOver = (Number(m.mise_kelly) || 0) > 0;
                         const mise = isOver ? m.mise_kelly : m.mise_under;
                         const cote = isOver ? m.cote_over : m.cote_under;
-                        const gain = mise * (cote || 1);
-                        totalMise += mise;
-                        totalGain += gain;
                         
+                        if (cote) {
+                            coteTotale *= Number(cote);
+                            nbParis++;
+                        }
+
                         rows += `<tr>
                             <td><strong>${m.home}</strong> vs ${m.away}</td>
                             <td>${isOver ? '<span style="color:var(--blue-electric)">Over</span>' : '<span style="color:var(--red-neon)">Under</span>'}</td>
-                            <td>${cote ? cote.toFixed(2) : '—'}</td>
-                            <td>${mise.toFixed(2)}€</td>
-                            <td style="color:var(--blue-electric)">${gain.toFixed(2)}€</td>
+                            <td>${cote ? Number(cote).toFixed(2) : '—'}</td>
+                            <td>${Number(mise).toFixed(2)}€</td>
                         </tr>`;
                     });
-                    
-                    const miseFC = totalMise * 2300;
-                    const gainFC = totalGain * 2300;
-                    
+
+                    const montantBaseFC = 2000;
+                    const gainTotalFC = coteTotale * montantBaseFC;
+
                     view.innerHTML = `
                         <div style="display:flex; align-items:center; margin-bottom:20px;">
                             <button class="btn-return" onclick="document.getElementById('paris-jour-view').remove()">← Retour</button>
                             <h2 style="margin-left:16px; font-size:20px; font-weight:800; color:white;">🎯 Paris du Jour</h2>
                         </div>
-                        
+
                         <table class="pari-table">
-                            <thead><tr><th>Match</th><th>Marché</th><th>Cote</th><th>Mise</th><th>Gain</th></tr></thead>
+                            <thead><tr><th>Match</th><th>Marché</th><th>Cote</th><th>Mise</th></tr></thead>
                             <tbody>${rows}</tbody>
                         </table>
-                        
+
                         <div class="pari-total">
-                            <div class="pari-total-row"><span>Nombre de paris</span><strong>${paris.length}</strong></div>
-                            <div class="pari-total-row"><span>Mise totale</span><strong>${miseFC.toLocaleString()} FC</strong></div>
-                            <div class="pari-total-row big"><span>Gain potentiel</span><strong>${gainFC.toLocaleString()} FC</strong></div>
+                            <div class="pari-total-row"><span>Nombre de paris</span><strong>${nbParis}</strong></div>
+                            <div class="pari-total-row"><span>Cote totale</span><strong>${coteTotale.toFixed(2)}</strong></div>
+                            <div class="pari-total-row"><span>Mise de base</span><strong>${montantBaseFC.toLocaleString()} FC</strong></div>
+                            <div class="pari-total-row big"><span>Gain potentiel</span><strong>${gainTotalFC.toLocaleString()} FC</strong></div>
                         </div>
                     `;
-                    
-                    document.body.appendChild(view);
                 })
                 .catch(e => alert("Erreur: " + e.message));
         }
