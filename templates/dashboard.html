@@ -1635,6 +1635,7 @@ async function loadHome() {
                 let matches = data.matches || data.predictions || [];
                 
                 // === BANDEAU PARI DU JOUR ===
+                let bannerHTML = '';
                 if (currentMarket === 'paris-jour') {
                     const paris = matches.filter(m => (m.mise_kelly || 0) > 0 || (m.mise_under || 0) > 0);
                     const cotes = paris.map(m => {
@@ -1644,10 +1645,10 @@ async function loadHome() {
                     }).filter(c => c !== null);
                     
                     const coteTotale = cotes.reduce((acc, c) => acc * c, 1);
-                    const miseFC = paris.reduce((acc, m) => acc + ((m.mise_kelly || 0) + (m.mise_under || 0)) * 2500, 0); // 1€ = 2500 FC (approx)
+                    const miseFC = paris.reduce((acc, m) => acc + ((m.mise_kelly || 0) + (m.mise_under || 0)) * 2300, 0); // 1$ = 2300 FC
                     const gainFC = miseFC * coteTotale;
                     
-                    el.innerHTML = `
+                    bannerHTML = `
                         <div class="pari-du-jour-header">
                             <h3>🎯 Paris du Jour</h3>
                             <div class="pari-du-jour-row"><span>Nombre de paris</span><strong>${paris.length}</strong></div>
@@ -1669,8 +1670,11 @@ async function loadHome() {
                 // 'all' → tous les matchs
 
                 document.getElementById('home-count').textContent = matches.length + ' match' + (matches.length > 1 ? 's' : '');
-                if (matches.length === 0) { el.innerHTML = `<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match pour ce marché</div>`; return; }
-                el.innerHTML = renderMatchesCard(matches);
+                if (matches.length === 0) { 
+                    el.innerHTML = bannerHTML + `<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match pour ce marché</div>`; 
+                    return; 
+                }
+                el.innerHTML = bannerHTML + renderMatchesCard(matches);
             } catch (e) {
                 console.error('loadHistory error:', e);
                 el.innerHTML = `<div class="card p-6 text-center"><div class="text-4xl mb-2">📡</div><div class="text-sm text-neutral-400 font-medium">Erreur: ${e.message}</div></div>`;
