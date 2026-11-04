@@ -275,7 +275,11 @@ def load_predictions(d: date):
         try:
             cur = conn.cursor()
             cur.execute(
-                "SELECT match_id, match_data, result, result_verdict FROM predictions WHERE date = %s",
+                """SELECT match_id, match_data, result, result_verdict,
+                          home_team_id, away_team_id, home_score, away_score,
+                          status, signal_strength, signal_reasons, retenu,
+                          cote_under, mise_under, is_under_bet
+                   FROM predictions WHERE date = %s""",
                 (d,)
             )
             rows = cur.fetchall()
@@ -283,12 +287,26 @@ def load_predictions(d: date):
 
             matches = {}
             for row in rows:
-                match_id, match_data, result, result_verdict = row
+                match_id, match_data, result, result_verdict, home_team_id, away_team_id, home_score, away_score, status, signal_strength, signal_reasons, retenu, cote_under, mise_under, is_under_bet = row
                 data = match_data
                 if isinstance(data, str):
                     data = json.loads(data)
+                if not isinstance(data, dict):
+                    data = {}
                 if result:
                     data["result"] = result if isinstance(result, dict) else json.loads(result)
+                # Ajouter les colonnes
+                data["home_team_id"] = home_team_id
+                data["away_team_id"] = away_team_id
+                data["home_score"] = home_score
+                data["away_score"] = away_score
+                data["status"] = status
+                data["signal_strength"] = signal_strength
+                data["signal_reasons"] = signal_reasons if isinstance(signal_reasons, (list, dict)) else (json.loads(signal_reasons) if signal_reasons else [])
+                data["retenu"] = retenu
+                data["cote_under"] = float(cote_under) if cote_under is not None else None
+                data["mise_under"] = float(mise_under) if mise_under is not None else 0.0
+                data["is_under_bet"] = is_under_bet
                 matches[match_id] = data
 
             # Cap FORCÉ des mises selon signal
@@ -328,7 +346,10 @@ def load_predictions(d: date):
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT match_id, match_data, result, result_verdict
+                    SELECT match_id, match_data, result, result_verdict,
+                           home_team_id, away_team_id, home_score, away_score,
+                           status, signal_strength, signal_reasons, retenu,
+                           cote_under, mise_under, is_under_bet
                     FROM predictions WHERE date = %s
                 """, (d,))
                 rows = cur.fetchall()
@@ -338,8 +359,21 @@ def load_predictions(d: date):
                 data = row["match_data"]
                 if isinstance(data, str):
                     data = json.loads(data)
+                if not isinstance(data, dict):
+                    data = {}
                 if row["result"]:
                     data["result"] = row["result"] if isinstance(row["result"], dict) else json.loads(row["result"])
+                data["home_team_id"] = row.get("home_team_id")
+                data["away_team_id"] = row.get("away_team_id")
+                data["home_score"] = row.get("home_score")
+                data["away_score"] = row.get("away_score")
+                data["status"] = row.get("status")
+                data["signal_strength"] = row.get("signal_strength")
+                data["signal_reasons"] = row.get("signal_reasons") if isinstance(row.get("signal_reasons"), (list, dict)) else (json.loads(row["signal_reasons"]) if row.get("signal_reasons") else [])
+                data["retenu"] = row.get("retenu")
+                data["cote_under"] = float(row["cote_under"]) if row.get("cote_under") is not None else None
+                data["mise_under"] = float(row["mise_under"]) if row.get("mise_under") is not None else 0.0
+                data["is_under_bet"] = row.get("is_under_bet")
                 matches[row["match_id"]] = data
 
             # Cap FORCÉ des mises selon signal
