@@ -444,7 +444,7 @@ class MatchPipeline:
         # === PARI SANS COTE (NOUVEAU) ===
         # Ne s'applique QUE si aucun autre signal n'a été trouvé (signal_strength == "rejected")
         # ET que la cote est trop basse (< 1.15) ou absente
-        if signal_strength == "rejected" and (cote_over is None or cote_over < 1.15):
+        if signal_strength == "rejected" and (cote_over is None or cote_over < 1.40):
             score_val = ensemble.score
             if score_val >= 6.5:
                 signal_strength = "medium_nocote"
