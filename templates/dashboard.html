@@ -1354,7 +1354,6 @@
                 loadTeamLogos(m.home_team_id, m.away_team_id, m.home, m.away);
                 loadStarPlayers(data.top_players, m.home, m.away);
                 if (m.match_id) loadMatchLineup(m.match_id, 'pitch-container');
-                if (m.match_id) loadMatchLineup(m.match_id, 'pitch-container');
             } catch (e) {
                 document.getElementById('modal-content').innerHTML = '<div class="text-center text-danger p-4">Erreur: ' + e.message + '</div>';
             }

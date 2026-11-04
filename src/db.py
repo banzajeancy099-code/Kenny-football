@@ -445,7 +445,9 @@ def get_archive(limit=90):
                 cur2.execute("""
                     SELECT home, away, score, result_verdict,
                            mise_kelly, mise_under, cote_over, cote_under,
-                           proba_over, edge, is_under_bet, result
+                           proba_over, edge, is_under_bet, result,
+                           home_team_id, away_team_id, home_score, away_score,
+                           status, signal_strength
                     FROM predictions
                     WHERE date = %s AND result_verdict IS NOT NULL
                     ORDER BY score DESC
@@ -468,6 +470,12 @@ def get_archive(limit=90):
                         "edge": float(m[9]) if m[9] is not None else None,
                         "is_under_bet": m[10],
                         "result": m[11],  # dict avec home_score, away_score
+                        "home_team_id": m[12],
+                        "away_team_id": m[13],
+                        "home_score": m[14],
+                        "away_score": m[15],
+                        "status": m[16],
+                        "signal_strength": m[17],
                     })
 
                 out.append({
@@ -486,31 +494,6 @@ def get_archive(limit=90):
             log.error(f"❌ Erreur get_archive: {e}")
             return []
 
-    with get_conn() as conn:
-        if conn is None:
-            return []
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT 
-                        date::text AS date,
-                        COUNT(*) AS total,
-                        COUNT(*) FILTER (WHERE is_under_bet = FALSE) AS over_count,
-                        COUNT(*) FILTER (WHERE is_under_bet = TRUE) AS under_count,
-                        COUNT(*) FILTER (WHERE result_verdict = '✓') AS correct,
-                        COUNT(*) FILTER (WHERE result_verdict = '×') AS wrong,
-                        COUNT(*) FILTER (WHERE result_verdict IS NOT NULL) AS verified,
-                        MAX(updated_at)::text AS last_update
-                    FROM predictions
-                    WHERE result_verdict IS NOT NULL
-                    GROUP BY date
-                    ORDER BY date DESC
-                    LIMIT %s
-                """, (limit,))
-                return cur.fetchall()
-        except Exception as e:
-            log.error(f"❌ Erreur get_archive: {e}")
-            return []
 
 
 # ========== SNAPSHOTS DE COTES ==========
@@ -542,22 +525,6 @@ def get_odds_history(home, away, limit=10):
     if not HAS_PSYCOPG2 or not DATABASE_URL:
         return []
 
-    with get_conn() as conn:
-        if conn is None:
-            return []
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT timestamp, best_over_2_5, bookmaker
-                    FROM odds_snapshots
-                    WHERE LOWER(home) = LOWER(%s) AND LOWER(away) = LOWER(%s)
-                    ORDER BY timestamp ASC
-                    LIMIT %s
-                """, (home, away, limit))
-                return cur.fetchall()
-        except Exception as e:
-            log.error(f"❌ get_odds_history: {e}")
-            return []
 
 
 def get_snapshot_count():
