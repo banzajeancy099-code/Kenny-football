@@ -769,6 +769,169 @@
             vertical-align: middle;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        .pari-du-jour-header {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 16px;
+            color: white;
+            box-shadow: 0 4px 15px rgba(34,197,94,0.3);
+        }
+        .pari-du-jour-header h3 {
+            font-size: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .pari-du-jour-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin: 4px 0;
+        }
+        .pari-du-jour-row strong {
+            font-weight: 800;
+        }
+
+        /* === CARTES HISTORIQUE PRO === */
+        .history-card-pro {
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 16px;
+            background: linear-gradient(145deg, #1a1a1a, #111);
+            border: 1px solid rgba(255,255,255,0.08);
+            animation: slideIn 0.4s ease-out;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .history-card-pro:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+        }
+        .history-card-pro.win {
+            border-color: rgba(74,222,128,0.4);
+            box-shadow: 0 0 20px rgba(74,222,128,0.1);
+        }
+        .history-card-pro.loss {
+            border-color: rgba(239,68,68,0.4);
+        }
+        .history-card-pro.pending {
+            border-color: rgba(251,191,36,0.3);
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .history-header-pro {
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .history-date-pro {
+            font-size: 18px;
+            font-weight: 800;
+            color: white;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .history-badge-pro {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .history-badge-pro.win { background: rgba(74,222,128,0.15); color: #4ade80; }
+        .history-badge-pro.loss { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .history-badge-pro.pending { background: rgba(251,191,36,0.15); color: #fbbf24; }
+        
+        .history-profit-pro {
+            font-size: 18px;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .history-profit-pro.positive { color: #4ade80; }
+        .history-profit-pro.negative { color: #ef4444; }
+        
+        .history-preview-pro {
+            padding: 12px 16px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.6);
+        }
+        .history-preview-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .history-preview-row:last-child { border-bottom: none; }
+        
+        .history-cta {
+            padding: 10px 16px 14px;
+            text-align: center;
+        }
+        .history-cta-btn {
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            color: white;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 8px 20px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: none;
+            cursor: pointer;
+        }
+        
+        /* === COLLECTION TABLEAU === */
+        .collection-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .collection-table th {
+            text-align: left;
+            padding: 8px 4px;
+            color: rgba(255,255,255,0.5);
+            font-weight: 700;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .collection-table td {
+            padding: 8px 4px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: white;
+        }
+        .collection-table tr.win td { background: rgba(74,222,128,0.05); }
+        .collection-table tr.loss td { background: rgba(239,68,68,0.05); }
+        
+        .collection-total {
+            margin-top: 16px;
+            padding: 16px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .collection-total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 12px;
+        }
+        .collection-total-row.big {
+            font-size: 16px;
+            font-weight: 800;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
 </style>
 </head>
 <body>
@@ -991,6 +1154,22 @@
             const s = sig || 'rejected';
             const icons = { strong: '🔥', medium: '⭐', weak: '🟡', rejected: '❌' };
             const labels = { strong: 'STRONG', medium: 'MEDIUM', weak: 'WEAK', rejected: 'REJECTED' };
+            const icons = {
+                "strong": "🔥",
+                "medium": "⭐",
+                "weak": "🟡",
+                "rejected": "❌",
+                "weak_nocote": "🎯",
+                "medium_nocote": "🎯",
+            };
+            const labels = {
+                "strong": "STRONG",
+                "medium": "MEDIUM",
+                "weak": "WEAK",
+                "rejected": "REJECTED",
+                "weak_nocote": "NOCOTE MOYEN",
+                "medium_nocote": "NOCOTE FORT",
+            };
             return `<span class="badge badge-${s}">${icons[s] || '?'} ${labels[s] || s.toUpperCase()}</span>`;
         }
         function fmtMoney(v) { return (v || 0).toFixed(2) + '€'; }
@@ -1198,7 +1377,8 @@
                 else if (market === 'btts') show = card.dataset.miseBtts > 0;
                 else if (market === '1x2') show = false;
                 else if (market === 'paris-jour') {
-                    show = (parseFloat(card.dataset.miseOver) > 0 || parseFloat(card.dataset.miseUnder) > 0);
+                    // Afficher TOUS les matchs analysés (même REJECTED, sans cote, etc.)
+                    show = true;
                 }
                 card.style.display = show ? '' : 'none';
                 if (show) visible++;
@@ -1224,44 +1404,61 @@
 
             let html = '<div class="p-4">';
             html += '<h3 class="text-lg font-bold text-white mb-4">📦 Collection du ' + date + '</h3>';
-            html += '<table class="w-full text-left text-xs">';
-            html += '<thead class="text-neutral-500 border-b border-neutral-800"><tr><th class="pb-2">Match</th><th class="pb-2">Marché</th><th class="pb-2">Cote</th><th class="pb-2">Mise</th><th class="pb-2">Résultat</th></tr></thead>';
+            
+            html += '<table class="collection-table">';
+            html += '<thead><tr><th>Match</th><th>Marché</th><th>Cote</th><th>Mise</th><th>Résultat</th></tr></thead>';
             html += '<tbody>';
             
             let totalMise = 0;
             let totalGain = 0;
-            let gagnes = 0;
-            let perdus = 0;
+            let gagnes = 0, perdus = 0, pending = 0;
 
             bets.forEach(m => {
-                const isOver = m.mise_kelly > 0;
+                const isOver = (m.mise_kelly || 0) > 0;
                 const mise = isOver ? m.mise_kelly : m.mise_under;
                 const cote = isOver ? m.cote_over : m.cote_under;
                 const verdict = m.result_verdict;
                 
                 let gain = 0;
-                if (verdict === '✓') { gain = mise * (cote - 1); gagnes++; }
-                else if (verdict === '×') { gain = -mise; perdus++; }
+                let rowClass = '';
+                if (verdict === '✓') { 
+                    gain = mise * ((cote || 1) - 1); 
+                    gagnes++; 
+                    rowClass = 'win';
+                } else if (verdict === '×') { 
+                    gain = -mise; 
+                    perdus++; 
+                    rowClass = 'loss';
+                } else {
+                    pending++;
+                }
                 
                 totalMise += mise;
                 totalGain += gain;
 
-                html += '<tr class="border-b border-neutral-800/50">';
-                html += '<td class="py-2">' + m.home + ' vs ' + m.away + '</td>';
-                html += '<td class="py-2">' + (isOver ? 'Over 2.5' : 'Under 2.5') + '</td>';
-                html += '<td class="py-2">' + (cote ? cote.toFixed(2) : '-') + '</td>';
-                html += '<td class="py-2">' + mise.toFixed(2) + '€</td>';
-                html += '<td class="py-2 font-bold ' + (verdict === '✓' ? 'text-accent' : verdict === '×' ? 'text-danger' : 'text-neutral-400') + '">' + (verdict || '?') + '</td>';
+                html += '<tr class="' + rowClass + '">';
+                html += '<td>' + m.home + ' vs ' + m.away + '</td>';
+                html += '<td>' + (isOver ? 'Over 2.5' : 'Under 2.5') + '</td>';
+                html += '<td class="mono">' + (cote ? cote.toFixed(2) : '—') + '</td>';
+                html += '<td class="mono">' + mise.toFixed(2) + '€</td>';
+                html += '<td class="mono font-bold ' + (verdict === '✓' ? 'text-green-400' : verdict === '×' ? 'text-red-400' : 'text-yellow-400') + '">' + (verdict || '⏳') + '</td>';
                 html += '</tr>';
             });
 
             html += '</tbody></table>';
-            html += '<div class="mt-4 p-3 bg-bg/50 rounded-lg">';
-            html += '<div class="flex justify-between text-sm"><span>Paris gagnés :</span><span class="text-accent font-bold">' + gagnes + '</span></div>';
-            html += '<div class="flex justify-between text-sm"><span>Paris perdus :</span><span class="text-danger font-bold">' + perdus + '</span></div>';
-            html += '<div class="flex justify-between text-sm"><span>Mise totale :</span><span>' + totalMise.toFixed(2) + '€</span></div>';
-            html += '<div class="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-neutral-700"><span>Profit/Perte :</span><span class="' + (totalGain >= 0 ? 'text-accent' : 'text-danger') + '">' + (totalGain >= 0 ? '+' : '') + totalGain.toFixed(2) + '€</span></div>';
+            
+            // Tableau total
+            const gainFC = totalGain * 2300;  // 1$ = 2300 FC
+            const miseFC = totalMise * 2300;
+            
+            html += '<div class="collection-total">';
+            html += '<div class="collection-total-row"><span>Paris gagnés</span><span class="text-green-400 font-bold">' + gagnes + ' ✓</span></div>';
+            html += '<div class="collection-total-row"><span>Paris perdus</span><span class="text-red-400 font-bold">' + perdus + ' ×</span></div>';
+            if (pending > 0) html += '<div class="collection-total-row"><span>En attente</span><span class="text-yellow-400 font-bold">' + pending + ' ⏳</span></div>';
+            html += '<div class="collection-total-row"><span>Mise totale</span><span class="mono">' + totalMise.toFixed(2) + '€ / ' + miseFC.toLocaleString() + ' FC</span></div>';
+            html += '<div class="collection-total-row big"><span>Gain / Perte</span><span class="mono ' + (totalGain >= 0 ? 'text-green-400' : 'text-red-400') + '">' + (totalGain >= 0 ? '+' : '') + totalGain.toFixed(2) + '€ / ' + gainFC.toLocaleString() + ' FC</span></div>';
             html += '</div>';
+            
             html += '</div>';
 
             document.getElementById('match-modal').classList.remove('hidden');
@@ -1437,6 +1634,30 @@ async function loadHome() {
                 const data = await r.json();
                 let matches = data.matches || data.predictions || [];
                 
+                // === BANDEAU PARI DU JOUR ===
+                if (currentMarket === 'paris-jour') {
+                    const paris = matches.filter(m => (m.mise_kelly || 0) > 0 || (m.mise_under || 0) > 0);
+                    const cotes = paris.map(m => {
+                        if ((m.mise_kelly || 0) > 0 && m.cote_over) return m.cote_over;
+                        if ((m.mise_under || 0) > 0 && m.cote_under) return m.cote_under;
+                        return null;
+                    }).filter(c => c !== null);
+                    
+                    const coteTotale = cotes.reduce((acc, c) => acc * c, 1);
+                    const miseFC = paris.reduce((acc, m) => acc + ((m.mise_kelly || 0) + (m.mise_under || 0)) * 2500, 0); // 1€ = 2500 FC (approx)
+                    const gainFC = miseFC * coteTotale;
+                    
+                    el.innerHTML = `
+                        <div class="pari-du-jour-header">
+                            <h3>🎯 Paris du Jour</h3>
+                            <div class="pari-du-jour-row"><span>Nombre de paris</span><strong>${paris.length}</strong></div>
+                            <div class="pari-du-jour-row"><span>Cote totale</span><strong>${coteTotale.toFixed(2)}</strong></div>
+                            <div class="pari-du-jour-row"><span>Mise totale</span><strong>${miseFC.toLocaleString()} FC</strong></div>
+                            <div class="pari-du-jour-row"><span>Gain potentiel</span><strong>${gainFC.toLocaleString()} FC</strong></div>
+                        </div>
+                    `;
+                }
+                
                 // Filtrer selon le marché (mises, pas probas)
                 if (currentMarket === 'over') {
                     matches = matches.filter(m => (m.mise_kelly || 0) > 0);
@@ -1472,50 +1693,70 @@ async function loadHome() {
             }
 
             let html = '';
-            historyData.forEach(d => {
+            historyData.forEach((d, idx) => {
                 let matches = d.matches || [];
 
-                // Filtrer selon marché actif
-                if (currentMarket === 'over') {
-                    matches = matches.filter(m => (m.mise_kelly || 0) > 0);
-                } else if (currentMarket === 'under') {
-                    matches = matches.filter(m => (m.mise_under || 0) > 0);
-                } else if (currentMarket === 'btts') {
-                    matches = matches.filter(m => (m.mise_btts || 0) > 0);
-                }
-                
-                // Filtrer selon historyFilter
-                if (historyFilter === 'correct') {
-                    matches = matches.filter(m => m.result_verdict === '✓');
-                } else if (historyFilter === 'wrong') {
-                    matches = matches.filter(m => m.result_verdict === '×');
-                }
+                // Filtre marché
+                if (currentMarket === 'over') matches = matches.filter(m => (m.mise_kelly || 0) > 0);
+                else if (currentMarket === 'under') matches = matches.filter(m => (m.mise_under || 0) > 0);
+                else if (currentMarket === 'btts') matches = matches.filter(m => (m.mise_btts || 0) > 0);
 
                 if (matches.length === 0) return;
 
                 const correct = matches.filter(m => m.result_verdict === '✓').length;
                 const wrong = matches.filter(m => m.result_verdict === '×').length;
+                const pending = matches.filter(m => !m.result_verdict).length;
 
-                html += `<div class="mb-4 border border-neutral-800 rounded-xl overflow-hidden bg-bg/50">
-                    <div class="flex items-center justify-between p-3 bg-neutral-900/50">
-                        <div class="flex items-center gap-2">
-                            <div class="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">${d.date || ''}</div>
+                // Statut global
+                let status = 'pending';
+                let badgeLabel = '⏳ En cours';
+                if (pending === 0 && correct > 0 && wrong === 0) {
+                    status = 'win';
+                    badgeLabel = '✓ Gagné';
+                } else if (pending === 0 && wrong > 0) {
+                    status = 'loss';
+                    badgeLabel = '× Perdu';
+                }
+
+                // Profit total (simulé, basé sur les mises)
+                const totalMise = matches.reduce((acc, m) => acc + (m.mise_kelly || 0) + (m.mise_under || 0), 0);
+                const profit = matches.reduce((acc, m) => {
+                    if (m.result_verdict === '✓') {
+                        if ((m.mise_kelly || 0) > 0 && m.cote_over) return acc + (m.mise_kelly * (m.cote_over - 1));
+                        if ((m.mise_under || 0) > 0 && m.cote_under) return acc + (m.mise_under * (m.cote_under - 1));
+                    } else if (m.result_verdict === '×') {
+                        return acc - ((m.mise_kelly || 0) + (m.mise_under || 0));
+                    }
+                    return acc;
+                }, 0);
+                
+                // Aperçu : 3 premiers matchs
+                let preview = '';
+                matches.slice(0, 3).forEach(m => {
+                    const isUnder = (m.mise_under || 0) > 0;
+                    const mise = isUnder ? m.mise_under : m.mise_kelly;
+                    const cote = isUnder ? m.cote_under : m.cote_over;
+                    const verdict = m.result_verdict || '⏳';
+                    const verdictColor = verdict === '✓' ? 'text-green-400' : verdict === '×' ? 'text-red-400' : 'text-yellow-400';
+                    preview += `<div class="history-preview-row"><span>${m.home} vs ${m.away}</span><span class="mono">${isUnder ? 'U' : 'O'} ${cote ? cote.toFixed(2) : '—'} · <span class="${verdictColor} font-bold">${verdict}</span></span></div>`;
+                });
+
+                html += `
+                    <div class="history-card-pro ${status}" onclick="showCollection('${d.date}')" style="animation-delay: ${idx * 0.1}s">
+                        <div class="history-header-pro">
+                            <div class="history-date-pro">${d.date || '?'}</div>
+                            <span class="history-badge-pro ${status}">${badgeLabel}</span>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <div class="mono text-[10px]">
-                                <span class="text-accent font-bold">${correct}✓</span>
-                                <span class="text-danger font-bold ml-2">${wrong}×</span>
-                            </div>
-                            <button class="bg-accent/20 text-accent text-[10px] font-bold px-3 py-1 rounded-full border border-accent/30" onclick="showCollection('${d.date}')">Voir la Collection</button>
+                        <div class="history-preview-pro">${preview}</div>
+                        <div class="history-header-pro" style="border-bottom:none; padding-top:8px; padding-bottom:8px;">
+                            <div class="text-[10px] text-neutral-500">${matches.length} paris · Mise ${totalMise.toFixed(2)}€</div>
+                            <div class="history-profit-pro ${profit >= 0 ? 'positive' : 'negative'}">${profit >= 0 ? '+' : ''}${profit.toFixed(2)}€</div>
+                        </div>
+                        <div class="history-cta">
+                            <button class="history-cta-btn">Voir la collection →</button>
                         </div>
                     </div>
-                    <details class="group" open>
-                        <summary class="hidden"></summary>
-                        <div class="p-3 pt-0">
-                            ${renderMatchesCard(matches)}
-                        </div>
-                    </details>
-                </div>`;
+                `;
             });
 
             if (html === '') {
