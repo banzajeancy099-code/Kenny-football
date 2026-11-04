@@ -724,6 +724,8 @@ def predictions_today():
             cap = 10.0
         elif signal == "weak":
             cap = 5.0
+        elif signal in ("weak_nocote", "medium_nocote"):
+            cap = 5.0
         else:  # rejected
             cap = 0.0
         
@@ -746,6 +748,8 @@ def predictions_today():
         elif signal == "medium":
             cap = 10.0
         elif signal == "weak":
+            cap = 5.0
+        elif signal in ("weak_nocote", "medium_nocote"):
             cap = 5.0
         else:
             cap = 0.0
