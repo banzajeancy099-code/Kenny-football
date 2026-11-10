@@ -24,7 +24,15 @@ import pg8000.native
 # ================================================================== #
 def _parse_database_url(url: str) -> dict:
     """Parse postgresql://user:pass@host:port/db?sslmode=require."""
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse, parse_qs
+
+    # Supprime channel_binding (incompatible avec pg8000 sur Render)
+    if "channel_binding" in url:
+        sep = "&" if "?" in url and "?" not in url.split("?")[0] else "?"
+        # Retire tous les paramètres channel_binding
+        import re
+        url = re.sub(r"[&?]channel_binding=[^&]*", "", url)
+
     u = urlparse(url)
     return {
         "user": u.username,
