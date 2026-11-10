@@ -1,0 +1,2084 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Kenny Football · Dashboard Pro</title>
+    <script src="https://cdn.tailwindcss.com/3.4.1"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        bg: '#0a0a0a', card: '#111111', cardHover: '#161616',
+                        accent: '#4ade80', accentDim: '#22c55e',
+                        danger: '#ef4444', warning: '#f59e0b',
+                    },
+                    boxShadow: { glow: '0 0 24px rgba(74, 222, 128, 0.12)' },
+                }
+            }
+        }
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: #0a0a0a; color: #e5e5e5; overscroll-behavior: none; }
+        body::before {
+            content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 40px 40px; pointer-events: none; z-index: 0;
+        }
+        .content { position: relative; z-index: 1; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+        .card { background: #111111; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+        .pulse-dot { animation: pulse-dot 2s infinite; }
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+        .tab-active { color: #4ade80; }
+        .tab-active .tab-icon { filter: drop-shadow(0 0 8px rgba(74,222,128,0.4)); }
+        .header-sticky { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(10, 10, 10, 0.88); border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .btn-analyze { background: linear-gradient(135deg, #22c55e, #4ade80); color: #0a0a0a; font-weight: 700; transition: all 0.2s; box-shadow: 0 0 20px rgba(74, 222, 128, 0.25); }
+        .btn-analyze:hover { box-shadow: 0 0 32px rgba(74, 222, 128, 0.4); transform: translateY(-1px); }
+        .btn-analyze:active { transform: translateY(0); }
+        .match-row { padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
+        .match-row:hover { background: rgba(255,255,255,0.02); }
+        .match-row:first-child { border-top: none; }
+        .league-header { padding: 10px 16px; background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #a3a3a3; display: flex; justify-content: space-between; align-items: center; }
+        .league-header:first-child { border-top: none; }
+        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; border: 1px solid; }
+        .badge-strong { background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.3); }
+        .badge-medium { background: rgba(245,158,11,0.1); color: #fbbf24; border-color: rgba(245,158,11,0.3); }
+        .badge-weak { background: rgba(249,115,22,0.1); color: #fb923c; border-color: rgba(249,115,22,0.3); }
+        .badge-rejected { background: rgba(115,115,115,0.1); color: #a3a3a3; border-color: rgba(115,115,115,0.3); }
+        .badge-live { background: rgba(239,68,68,0.15); color: #f87171; border-color: rgba(239,68,68,0.35); }
+        .badge-soon { background: rgba(245,158,11,0.12); color: #fbbf24; border-color: rgba(245,158,11,0.3); }
+        .market-tab { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); transition: all 0.15s; }
+        .market-tab:hover:not(.market-active) { background: rgba(255,255,255,0.06); color: #e5e5e5; }
+        .market-active { background: rgba(74,222,128,0.12) !important; color: #4ade80 !important; border-color: rgba(74,222,128,0.3) !important; }
+        .score-tab { flex: 1; padding: 8px 0; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: #737373; transition: all 0.15s; cursor: pointer; }
+        .score-tab:hover:not(.score-active):not(.score-disabled) { background: rgba(255,255,255,0.06); color: #e5e5e5; }
+        .score-active { background: rgba(74,222,128,0.15) !important; color: #4ade80 !important; border-color: rgba(74,222,128,0.4) !important; box-shadow: 0 0 12px rgba(74,222,128,0.15); }
+        .score-disabled { opacity: 0.35; cursor: not-allowed; }
+        .score-disabled::after { content: ' 🚧'; font-size: 9px; }
+        .coming-soon { text-align: center; padding: 3rem 1rem; }
+        .coming-soon .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.6; }
+        .coming-soon .title { font-size: 1.1rem; font-weight: 700; color: #e5e5e5; margin-bottom: 0.5rem; }
+        .coming-soon .desc { font-size: 0.8rem; color: #737373; }
+        .score-row-enter { animation: slideDown 0.25s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-4px); max-height: 0; } to { opacity: 1; transform: translateY(0); max-height: 100px; } }
+    
+        /* === Séparation visuelle des matchs === */
+        .match-row {
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding: 16px 20px;
+            transition: background 0.2s ease, transform 0.15s ease;
+        }
+        .match-row:hover {
+            background: rgba(255,255,255,0.03);
+            transform: translateX(2px);
+        }
+        .match-row:last-child {
+            border-bottom: none;
+        }
+
+        /* === Heure en haut à droite === */
+        .match-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .match-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #a3a3a3;
+            background: rgba(255,255,255,0.05);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        /* === Boutons marchés "pro" === */
+        .market-btn {
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.02);
+            color: #a3a3a3;
+            letter-spacing: 0.02em;
+            position: relative;
+            overflow: hidden;
+        }
+        .market-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(16, 185, 129, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.4s, height 0.4s;
+        }
+        .market-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        .market-btn:hover {
+            color: #e5e5e5;
+            border-color: rgba(255,255,255,0.15);
+            transform: translateY(-1px);
+        }
+        .market-btn.active {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border-color: #10b981;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            transform: translateY(-1px);
+        }
+        .market-btn.active::before {
+            display: none;
+        }
+
+        /* === Barre de marchés scrollable avec padding === */
+        .market-bar {
+            padding: 12px 16px;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .market-bar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* === Score animé (pulse subtil) === */
+        .score-value {
+            font-family: 'JetBrains Mono', monospace;
+            transition: color 0.2s;
+        }
+        .score-value.high {
+            color: #10b981;
+            text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+        }
+
+        /* === Badges animés === */
+        .badge {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .badge:hover {
+            transform: scale(1.05);
+        }
+
+        /* === Fade-in cascade === */
+        .match-row {
+            animation: slideIn 0.3s ease-out backwards;
+        }
+        .match-row:nth-child(1) { animation-delay: 0.02s; }
+        .match-row:nth-child(2) { animation-delay: 0.04s; }
+        .match-row:nth-child(3) { animation-delay: 0.06s; }
+        .match-row:nth-child(4) { animation-delay: 0.08s; }
+        .match-row:nth-child(5) { animation-delay: 0.10s; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* === Cartes de match (conteneur) === */
+        .match-card {
+            background: #111111;
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        /* === Animations globales === */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+            50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.6); }
+        }
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        @keyframes bounceIn {
+            0% { opacity: 0; transform: scale(0.3); }
+            50% { opacity: 1; transform: scale(1.05); }
+            70% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* === Application aux éléments === */
+        body {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .header-sticky {
+            animation: slideInLeft 0.4s ease-out;
+        }
+
+        .market-btn {
+            animation: fadeInUp 0.3s ease-out backwards;
+        }
+        .market-btn:nth-child(1) { animation-delay: 0.05s; }
+        .market-btn:nth-child(2) { animation-delay: 0.10s; }
+        .market-btn:nth-child(3) { animation-delay: 0.15s; }
+        .market-btn:nth-child(4) { animation-delay: 0.20s; }
+        .market-btn:nth-child(5) { animation-delay: 0.25s; }
+
+        .league-header {
+            animation: fadeInUp 0.35s ease-out;
+        }
+
+        .match-row {
+            animation: fadeInUp 0.4s ease-out backwards;
+        }
+        .match-row:nth-child(1) { animation-delay: 0.05s; }
+        .match-row:nth-child(2) { animation-delay: 0.10s; }
+        .match-row:nth-child(3) { animation-delay: 0.15s; }
+        .match-row:nth-child(4) { animation-delay: 0.20s; }
+        .match-row:nth-child(5) { animation-delay: 0.25s; }
+        .match-row:nth-child(6) { animation-delay: 0.30s; }
+
+        .card {
+            animation: fadeInUp 0.4s ease-out;
+        }
+
+        .match-card {
+            animation: fadeInUp 0.4s ease-out;
+        }
+
+        /* Bouton "Analyser" avec pulse subtil */
+        .btn-analyze {
+            animation: pulse-glow 2s infinite;
+        }
+
+        /* Loading shimmer */
+        .loading-shimmer {
+            background: linear-gradient(90deg, #111 0%, #1a1a1a 50%, #111 100%);
+            background-size: 1000px 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        /* Badge LIVE pulse */
+        .badge-live {
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        /* Transitions pour les clicks */
+        .match-row {
+            cursor: pointer;
+        }
+        .match-row:active {
+            transform: scale(0.98);
+            transition: transform 0.1s;
+        }
+
+        /* Modale */
+        .modal-backdrop {
+            animation: fadeIn 0.2s ease-out;
+        }
+        .modal-content {
+            animation: bounceIn 0.3s ease-out;
+        }
+
+        /* Tab bottom nav */
+        .tab {
+            transition: all 0.2s ease;
+        }
+        .tab:active {
+            transform: scale(0.95);
+        }
+        .tab-active .tab-icon {
+            animation: bounceIn 0.4s ease-out;
+        }
+
+        summary::-webkit-details-marker { display: none; }
+        details[open] > summary span:first-child { transform: rotate(90deg); display: inline-block; }
+
+        /* === VUE TERRAIN === */
+        .pitch {
+            background: 
+                /* Surfaces de réparation (haut et bas) */
+                linear-gradient(180deg, 
+                    transparent 0%, 
+                    transparent 5%,
+                    rgba(255,255,255,0.15) 5%,
+                    rgba(255,255,255,0.15) 6%,
+                    transparent 6%,
+                    transparent 25%,
+                    rgba(255,255,255,0.15) 25%,
+                    rgba(255,255,255,0.15) 26%,
+                    transparent 26%,
+                    transparent 74%,
+                    rgba(255,255,255,0.15) 74%,
+                    rgba(255,255,255,0.15) 75%,
+                    transparent 75%,
+                    transparent 94%,
+                    rgba(255,255,255,0.15) 94%,
+                    rgba(255,255,255,0.15) 95%,
+                    transparent 95%
+                ),
+                repeating-linear-gradient(
+                    0deg,
+                    #15803d 0px,
+                    #15803d 40px,
+                    #166534 40px,
+                    #166534 80px
+                );
+            border-radius: 12px;
+            padding: 20px 8px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.2);
+            box-shadow: inset 0 0 60px rgba(0,0,0,0.3);
+        }
+        .pitch::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(255,255,255,0.4);
+            z-index: 0;
+        }
+        .pitch::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
+            background: transparent;
+            z-index: 0;
+        }
+        /* Surface de réparation haut */
+        .pitch-surface-top {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50%;
+            height: 15%;
+            border: 2px solid rgba(255,255,255,0.35);
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            z-index: 0;
+        }
+        /* Surface de réparation bas */
+        .pitch-surface-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50%;
+            height: 15%;
+            border: 2px solid rgba(255,255,255,0.35);
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            z-index: 0;
+        }
+        /* Point de penalty haut */
+        .pitch-penalty-top {
+            position: absolute;
+            top: 8%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            z-index: 0;
+        }
+        /* Point de penalty bas */
+        .pitch-penalty-bottom {
+            position: absolute;
+            bottom: 8%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            z-index: 0;
+        }
+        .pitch::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(255,255,255,0.3);
+            z-index: 0;
+        }
+        .pitch::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            background: transparent;
+            z-index: 0;
+        }
+        .pitch-center-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 50%;
+            z-index: 1;
+        }
+        .pitch-half {
+            position: relative;
+            z-index: 1;
+        }
+        .pitch-half.home-half {
+            padding-bottom: 30px;
+            border-bottom: 1px solid transparent;
+        }
+        .pitch-half.away-half {
+            padding-top: 30px;
+        }
+        .pitch::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(255,255,255,0.25);
+        }
+        .pitch::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 50%;
+        }
+        .pitch-team {
+            position: relative;
+            z-index: 1;
+            margin: 8px 0;
+        }
+        .pitch-team-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 6px 12px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
+        }
+        .pitch-team-logo {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+        }
+        .pitch-team-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+        }
+        .pitch-formation {
+            font-size: 9px;
+            color: rgba(255,255,255,0.6);
+            margin-left: 4px;
+        }
+        .pitch-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 14px 0;
+            flex-wrap: nowrap;
+            padding: 0 4px;
+        }
+        .pitch-row:first-child {
+            margin-top: 4px;
+        }
+        .pitch-row:last-child {
+            margin-bottom: 4px;
+        }
+        .pitch-player {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 42px;
+            max-width: 52px;
+            flex: 0 1 auto;
+        }
+        .pitch-player-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.3);
+            object-fit: cover;
+            position: relative;
+        }
+        .pitch-player.is-captain .pitch-player-avatar {
+            border-color: #fbbf24;
+            box-shadow: 0 0 12px rgba(251,191,36,0.6);
+        }
+        .pitch-player-number {
+            position: absolute;
+            bottom: -4px;
+            right: -4px;
+            background: #0a0a0a;
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .pitch-player-name {
+            font-size: 8px;
+            color: white;
+            margin-top: 3px;
+            text-align: center;
+            line-height: 1.1;
+            max-width: 52px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pitch-player-score {
+            font-size: 8px;
+            color: #fbbf24;
+            font-weight: 700;
+        }
+
+        /* === CARTE JOUEUR CLÉ === */
+        .star-cards {
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .star-card {
+            flex: 1;
+            background: linear-gradient(145deg, rgba(30,30,30,0.95), rgba(15,15,15,0.95));
+            border: 1px solid rgba(74,222,128,0.3);
+            border-radius: 12px;
+            padding: 8px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .star-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #4ade80, transparent);
+        }
+        .star-card-avatar {
+            width: 100%;
+            aspect-ratio: 3/4;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.5);
+            object-fit: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: #4ade80;
+            margin-bottom: 6px;
+        }
+        .star-card-name {
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .star-card-badge {
+            font-size: 8px;
+            color: #fbbf24;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+        .star-card-photo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        /* === V2 PRO : TERRAIN ET CARTES === */
+        .modal-header-pro {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: rgba(20,20,20,0.95);
+            text-align: center;
+            font-weight: 700;
+            font-size: 16px;
+        }
+        
+        /* Cartes joueurs (style Panini) */
+        .star-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; margin-bottom: 16px; }
+        .star-card {
+            background: #1a1a1a; border-radius: 12px; overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08); position: relative;
+            display: flex; flex-direction: column;
+        }
+        .star-card-img-wrapper {
+            width: 100%; height: 160px; position: relative;
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+        }
+        .star-card-img-wrapper img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+        .star-card-info { padding: 10px; text-align: center; }
+        .star-card-name { font-size: 12px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .star-card-badge { font-size: 9px; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
+        /* Score central */
+        .score-section { padding: 0 16px 16px; text-align: center; }
+        .score-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+        .team-logo-circle {
+            width: 48px; height: 48px; border-radius: 50%; background: #111;
+            border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .team-logo-circle img { width: 36px; height: 36px; object-fit: contain; }
+        .score-big { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 800; color: white; line-height: 1; }
+        .signal-badge-pro { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+        .signal-rejected { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .signal-medium { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .signal-strong { background: rgba(74,222,128,0.2); color: #4ade80; }
+        .signal-medium_nocote { background: rgba(168,85,247,0.2); color: #a855f7; }
+        .signal-weak_nocote { background: rgba(234,179,8,0.2); color: #eab308; }
+
+        /* Terrain V2 */
+        .pitch-pro {
+            background: linear-gradient(180deg, #15803d 0%, #166534 100%); /* Vert uni profond */
+            border-radius: 12px; margin: 0 16px 16px; padding: 20px 8px;
+            position: relative; overflow: hidden; border: 2px solid rgba(255,255,255,0.2);
+        }
+        .pitch-lines { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
+        .pitch-lines::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.3); }
+        .pitch-lines::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; }
+        
+        .pitch-team-header {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            margin-bottom: 16px; padding: 4px 12px;
+            background: rgba(0,0,0,0.5); border-radius: 20px; width: fit-content; margin-left: auto; margin-right: auto;
+        }
+        .pitch-team-header img { width: 20px; height: 20px; object-fit: contain; }
+        .pitch-team-header span { font-size: 12px; font-weight: 700; color: white; }
+
+        /* Lignes de joueurs */
+        .pitch-row-pro { display: flex; justify-content: space-around; align-items: flex-start; margin: 14px 0; gap: 4px; }
+        .pitch-player-pro { display: flex; flex-direction: column; align-items: center; width: 56px; position: relative; }
+        .pitch-player-pro img {
+            width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
+            border: 2px solid rgba(255,255,255,0.3); background: #111; margin-bottom: 4px;
+        }
+        .pitch-player-pro.is-captain img { border-color: #fbbf24; box-shadow: 0 0 10px rgba(251,191,36,0.4); }
+        
+        /* Le cartouche du nom (style Barça) */
+        .pitch-player-pro .p-name-box {
+            background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.1);
+            padding: 2px 4px; border-radius: 4px; font-size: 8px; color: white;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .pitch-player-pro .p-num {
+            position: absolute; top: -4px; right: 4px;
+            background: #000; color: white; font-size: 9px; font-weight: 700;
+            padding: 1px 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        /* Bouton Paris du Jour */
+        .btn-paris-jour {
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            color: white; font-weight: 800; text-align: center;
+            padding: 10px; border-radius: 12px; text-transform: uppercase;
+            letter-spacing: 1px; box-shadow: 0 4px 15px rgba(34,197,94,0.3);
+            font-size: 13px;
+        }
+
+        .btn-analyze.loading {
+            pointer-events: none;
+            opacity: 0.8;
+        }
+        .btn-analyze.loading::after {
+            content: '';
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            margin-left: 8px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .pari-du-jour-header {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 16px;
+            color: white;
+            box-shadow: 0 4px 15px rgba(34,197,94,0.3);
+        }
+        .pari-du-jour-header h3 {
+            font-size: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .pari-du-jour-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin: 4px 0;
+        }
+        .pari-du-jour-row strong {
+            font-weight: 800;
+        }
+
+        /* === CARTES HISTORIQUE PRO === */
+        .history-card-pro {
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 16px;
+            background: linear-gradient(145deg, #1a1a1a, #111);
+            border: 1px solid rgba(255,255,255,0.08);
+            animation: slideIn 0.4s ease-out;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .history-card-pro:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+        }
+        .history-card-pro.win {
+            border-color: rgba(74,222,128,0.4);
+            box-shadow: 0 0 20px rgba(74,222,128,0.1);
+        }
+        .history-card-pro.loss {
+            border-color: rgba(239,68,68,0.4);
+        }
+        .history-card-pro.pending {
+            border-color: rgba(251,191,36,0.3);
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .history-header-pro {
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .history-date-pro {
+            font-size: 18px;
+            font-weight: 800;
+            color: white;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .history-badge-pro {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .history-badge-pro.win { background: rgba(74,222,128,0.15); color: #4ade80; }
+        .history-badge-pro.loss { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .history-badge-pro.pending { background: rgba(251,191,36,0.15); color: #fbbf24; }
+        
+        .history-profit-pro {
+            font-size: 18px;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .history-profit-pro.positive { color: #4ade80; }
+        .history-profit-pro.negative { color: #ef4444; }
+        
+        .history-preview-pro {
+            padding: 12px 16px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.6);
+        }
+        .history-preview-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .history-preview-row:last-child { border-bottom: none; }
+        
+        .history-cta {
+            padding: 10px 16px 14px;
+            text-align: center;
+        }
+        .history-cta-btn {
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            color: white;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 8px 20px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: none;
+            cursor: pointer;
+        }
+        
+        /* === COLLECTION TABLEAU === */
+        .collection-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .collection-table th {
+            text-align: left;
+            padding: 8px 4px;
+            color: rgba(255,255,255,0.5);
+            font-weight: 700;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .collection-table td {
+            padding: 8px 4px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: white;
+        }
+        .collection-table tr.win td { background: rgba(74,222,128,0.05); }
+        .collection-table tr.loss td { background: rgba(239,68,68,0.05); }
+        
+        .collection-total {
+            margin-top: 16px;
+            padding: 16px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .collection-total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 12px;
+        }
+        .collection-total-row.big {
+            font-size: 16px;
+            font-weight: 800;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* === PALETTE PRO === */
+        :root {
+            --bg-dark: #0a0a0a;
+            --bg-card: #141414;
+            --bg-card-hover: #1a1a1a;
+            --border-color: #222;
+            --text-main: #e5e5e5;
+            --text-muted: #888;
+            --blue-electric: #007BFF;
+            --red-neon: #EF072A;
+            --green-pro: #22c55e;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #141414, #0a0a0a);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Barre de navigation */
+        .nav-bar, .market-bar {
+            background: rgba(10, 10, 10, 0.95) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            backdrop-filter: blur(12px);
+        }
+        
+        /* Boutons de marché */
+        .market-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+        .market-btn:hover {
+            border-color: var(--blue-electric);
+            color: white;
+        }
+        .market-btn.active {
+            background: rgba(0, 123, 255, 0.15) !important;
+            border-color: var(--blue-electric) !important;
+            color: var(--blue-electric) !important;
+        }
+        
+        /* Bouton "Paris du Jour" */
+        .btn-paris-jour {
+            background: linear-gradient(90deg, var(--blue-electric), #0056b3);
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+        
+        /* Bouton Analyser */
+        .btn-analyze {
+            background: var(--blue-electric);
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        /* Cartes de match */
+        .match-row {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .match-row:hover {
+            background: var(--bg-card-hover);
+            border-color: #333;
+        }
+        
+        /* Indicateur Over/Under (barre latérale) */
+        .match-row[data-mise-over]:not([data-mise-over="0"])::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+            background: var(--blue-electric);
+        }
+        .match-row[data-mise-under]:not([data-mise-under="0"])::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+            background: var(--red-neon);
+        }
+
+        /* Badges */
+        .badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+        .badge-strong { background: rgba(0, 123, 255, 0.2); color: var(--blue-electric); }
+        .badge-weak_nocote { background: rgba(0, 123, 255, 0.2); color: var(--blue-electric); }
+        .badge-medium_nocote { background: rgba(0, 123, 255, 0.2); color: var(--blue-electric); }
+        .badge-rejected { background: rgba(239, 7, 42, 0.2); color: var(--red-neon); }
+
+        /* Vue "Paris du Jour" Plein Écran */
+        #paris-jour-view {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg-dark);
+            z-index: 100;
+            overflow-y: auto;
+            padding: 16px;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .pari-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        .pari-table th { text-align: left; padding: 8px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); }
+        .pari-table td { padding: 8px; font-size: 12px; border-bottom: 1px solid var(--border-color); }
+        .pari-table tr:hover td { background: var(--bg-card-hover); }
+        
+        .pari-total { margin-top: 20px; padding: 16px; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--blue-electric); }
+        .pari-total-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+        .pari-total-row.big { font-size: 18px; font-weight: 800; color: var(--blue-electric); margin-top: 12px; padding-top: 12px; border-top: 1px solid #333; }
+        
+        .btn-return { background: var(--bg-card); border: 1px solid var(--border-color); color: white; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-return:hover { background: var(--border-color); }
+</style>
+</head>
+<body>
+    <div class="content min-h-screen pb-24">
+
+        <!-- HEADER -->
+        <header class="header-sticky">
+            <div class="max-w-2xl mx-auto px-4 py-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-xl shadow-glow relative">
+                            ⚽
+                            <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent border-2 border-bg pulse-dot"></span>
+                        </div>
+                        <div>
+                            <h1 class="text-[15px] font-extrabold text-white tracking-tight leading-none">Kenny Football</h1>
+                            <div class="flex items-center gap-1.5 mt-1">
+                                <span class="w-1 h-1 rounded-full bg-accent"></span>
+                                <span class="text-[10px] text-neutral-400 font-medium tracking-wide">v2.0 · Scheduler actif</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="handleAnalyze(this)" class="btn-analyze px-3.5 py-2 rounded-lg text-xs flex items-center gap-1.5">
+                        <span>🔍</span><span>Analyser</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- BARRE MARCHÉS (row 1) -->
+        <div class="sticky top-[57px] z-30 border-b border-white/5" style="backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(10,10,10,0.92);">
+            <div class="max-w-2xl mx-auto px-4 pt-2 pb-1">
+                <div class="market-bar flex gap-2 overflow-x-auto">
+                    <button data-market="all" class="market-btn">Tous</button>
+                    <button data-market="over" class="market-btn">Over</button>
+                    <button data-market="btts" class="market-btn">BTTS</button>
+                    <button data-market="under" class="market-btn">Under</button>
+                    <button data-market="1x2" class="market-btn">1X2</button>
+</div>
+        </div>
+    <!-- Sélecteur de date -->
+    <div class="px-3 mb-3">
+        <div class="flex items-center gap-2 bg-card rounded-xl p-2 border border-white/10">
+            <span class="text-neutral-400 text-sm">📅</span>
+            <input type="date" id="date-picker" 
+                   class="flex-1 bg-transparent text-white text-sm outline-none"
+                   onchange="loadHomeForDate(this.value)">
+            <button onclick="loadHomeForDate(document.getElementById('date-picker').value)"
+                    class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+                Charger
+            </button>
+        </div>
+    </div>
+
+        <!-- Bouton Paris du Jour EN DESSOUS des filtres -->
+        <div class="px-4 pt-3 pb-2">
+            <button class="btn-paris-jour w-full" onclick="openParisJour()">🎯 Paris du Jour</button>
+        </div>
+            <!-- SCORE BAR (row 2 - conditionnelle) -->
+            <div id="score-bar" class="hidden">
+                <div class="max-w-2xl mx-auto px-4 pt-2 pb-2 score-row-enter">
+                    <div class="flex gap-1.5">
+                        <div class="score-tab score-disabled" data-score="1.5">1.5</div>
+                        <div class="score-tab score-active" data-score="2.5">2.5</div>
+                        <div class="score-tab score-disabled" data-score="3.5">3.5</div>
+                        <div class="score-tab score-disabled" data-score="4.5">4.5</div>
+                        <div class="score-tab score-disabled" data-score="5.5">5.5</div>
+                        <div class="score-tab score-disabled" data-score="6.5">6.5</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN -->
+        <main class="max-w-2xl mx-auto px-4 py-4">
+            <div id="tab-home" class="tab-content">
+                <div class="flex items-baseline justify-between mb-3">
+                    <h2 class="text-lg font-extrabold text-white tracking-tight" id="home-title">Aujourd'hui</h2>
+                    <span id="home-count" class="mono text-[10px] text-neutral-500 uppercase tracking-widest"></span>
+                </div>
+                <div id="home-content">
+                    <div class="card p-6 text-center text-neutral-500 text-sm fade-in">Chargement...</div>
+                </div>
+            </div>
+
+            <div id="tab-history" class="tab-content hidden">
+                <h2 class="text-lg font-extrabold text-white tracking-tight mb-3">Historique</h2>
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <div class="card p-3 text-center cursor-pointer hover:bg-white/5 transition" onclick="filterHistory('correct')">
+                        <div class="mono text-2xl font-extrabold text-accent" id="stat-correct">0</div>
+                        <div class="text-[9px] text-neutral-500 uppercase tracking-widest mt-0.5">Corrects</div>
+                    </div>
+                    <div class="card p-3 text-center cursor-pointer hover:bg-white/5 transition" onclick="filterHistory('wrong')">
+                        <div class="mono text-2xl font-extrabold text-danger" id="stat-wrong">0</div>
+                        <div class="text-[9px] text-neutral-500 uppercase tracking-widest mt-0.5">Ratés</div>
+                    </div>
+                    <div class="card p-3 text-center cursor-pointer hover:bg-white/5 transition" onclick="filterHistory('all')">
+                        <div class="mono text-2xl font-extrabold text-white" id="stat-accuracy">—</div>
+                        <div class="text-[9px] text-neutral-500 uppercase tracking-widest mt-0.5">Précision</div>
+                    </div>
+                </div>
+                <button onclick="verifyResults()" class="w-full card p-3 mb-3 flex items-center justify-center gap-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition">
+                    🔄 Vérifier les résultats
+                </button>
+                <div id="history-content">
+                    <div class="card p-6 text-center text-neutral-500 text-sm">Chargement...</div>
+                </div>
+            </div>
+
+            <div id="tab-subscription" class="tab-content hidden">
+                <h2 class="text-lg font-extrabold text-white tracking-tight mb-3">Abonnement</h2>
+                <div class="card p-8 text-center">
+                    <div class="text-5xl mb-3">💎</div>
+                    <h3 class="text-lg font-bold text-white mb-1">Premium</h3>
+                    <p class="text-sm text-neutral-400 mb-4">Bientôt disponible</p>
+                    <button class="btn-analyze px-6 py-2.5 rounded-lg text-sm opacity-50 cursor-not-allowed">S'abonner</button>
+                </div>
+            </div>
+
+            <div id="tab-menu" class="tab-content hidden">
+                <h2 class="text-lg font-extrabold text-white tracking-tight mb-3">Menu</h2>
+                <div class="card divide-y divide-white/5">
+                    <a href="/api/health" target="_blank" class="flex items-center justify-between p-4 hover:bg-white/[0.02] transition">
+                        <span class="text-sm font-medium text-white">🩺 Santé du système</span><span class="text-neutral-500">→</span>
+                    </a>
+                    <a href="/api/cron/status" target="_blank" class="flex items-center justify-between p-4 hover:bg-white/[0.02] transition">
+                        <span class="text-sm font-medium text-white">⏰ Statut des jobs</span><span class="text-neutral-500">→</span>
+                    </a>
+                    <a href="/api/stats" target="_blank" class="flex items-center justify-between p-4 hover:bg-white/[0.02] transition">
+                        <span class="text-sm font-medium text-white">📊 Statistiques</span><span class="text-neutral-500">→</span>
+                    </a>
+                    <a href="https://github.com/banzajeancy099-code/Kenny-football" target="_blank" class="flex items-center justify-between p-4 hover:bg-white/[0.02] transition">
+                        <span class="text-sm font-medium text-white">📦 Code source</span><span class="text-neutral-500">→</span>
+                    </a>
+                </div>
+                <div class="card p-4 mt-3">
+                    <div class="text-[10px] text-neutral-500 uppercase tracking-widest mb-1">Version</div>
+                    <div class="mono text-sm text-white">Kenny Football v2.0</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- BOTTOM NAV -->
+        <nav class="fixed bottom-0 left-0 right-0 z-50" style="backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(10,10,10,0.95); border-top: 1px solid rgba(255,255,255,0.06);">
+            <div class="grid grid-cols-4 max-w-2xl mx-auto">
+                <button data-tab="home" class="tab tab-active py-2.5 flex flex-col items-center text-[10px] font-bold transition">
+                    <span class="tab-icon text-lg mb-0.5">🏠</span><span>Accueil</span>
+                </button>
+                <button data-tab="history" class="tab py-2.5 flex flex-col items-center text-[10px] font-bold text-neutral-500 transition">
+                    <span class="tab-icon text-lg mb-0.5">📜</span><span>Historique</span>
+                </button>
+                <button data-tab="subscription" class="tab py-2.5 flex flex-col items-center text-[10px] font-bold text-neutral-500 transition">
+                    <span class="tab-icon text-lg mb-0.5">💎</span><span>Abonnement</span>
+                </button>
+                <button data-tab="menu" class="tab py-2.5 flex flex-col items-center text-[10px] font-bold text-neutral-500 transition">
+                    <span class="tab-icon text-lg mb-0.5">☰</span><span>Menu</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        let currentMarket = 'all';
+        let currentScore = 2.5;
+
+        function switchMarket(market) {
+            currentMarket = market;
+            document.querySelectorAll('.market-btn').forEach(el => {
+                el.classList.remove('active');
+            });
+            const active = document.querySelector(`.market-btn[data-market="${market}"]`);
+            if (active) { active.classList.add('active'); }
+
+            const scoreBar = document.getElementById('score-bar');
+            if (market === 'over' || market === 'under') { scoreBar.classList.remove('hidden'); }
+            else { scoreBar.classList.add('hidden'); }
+            
+            // Paris du Jour : cacher la barre de score
+            if (market === 'paris-jour') { scoreBar.classList.add('hidden'); }
+
+            updateHomeTitle();
+            loadHome();
+        }
+        document.querySelectorAll('.market-btn').forEach(tab => {
+            tab.addEventListener('click', () => switchMarket(tab.dataset.market));
+        });
+
+        // Fallback : marquer "Tous" comme actif au démarrage
+        document.addEventListener('DOMContentLoaded', () => {
+            const anyActive = document.querySelector('.market-btn.active');
+            if (!anyActive) {
+                const allBtn = document.querySelector('.market-btn[data-market="all"]');
+                if (allBtn) allBtn.classList.add('active');
+            }
+        });
+
+        function switchScore(score) {
+            const target = document.querySelector(`.score-tab[data-score="${score}"]`);
+            if (target && target.classList.contains('score-disabled')) return;
+            currentScore = parseFloat(score);
+            document.querySelectorAll('.score-tab').forEach(el => el.classList.remove('score-active'));
+            if (target) target.classList.add('score-active');
+            updateHomeTitle();
+            loadHome();
+        }
+        document.querySelectorAll('.score-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchScore(tab.dataset.score));
+        });
+
+        function updateHomeTitle() {
+            const el = document.getElementById('home-title');
+            if (currentMarket === 'over') el.textContent = `Over ${currentScore}`;
+            else if (currentMarket === 'under') el.textContent = `Under ${currentScore}`;
+            else {
+                const titles = { 'all': "Aujourd'hui", 'btts': 'BTTS', '1x2': '1X2', 'paris-jour': 'Paris du Jour' };
+                el.textContent = titles[currentMarket] || "Aujourd'hui";
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            document.querySelectorAll('.tab').forEach(el => {
+                el.classList.remove('tab-active');
+                el.classList.add('text-neutral-500');
+            });
+            const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
+            if (activeTab) { activeTab.classList.add('tab-active'); activeTab.classList.remove('text-neutral-500'); }
+            if (tabName === 'history') loadHistory();
+            if (tabName === 'home') loadHome();
+        }
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        });
+
+        function signalBadge(sig) {
+            const s = sig || 'rejected';
+            const icons = {
+                "strong": "🔥",
+                "medium": "⭐",
+                "weak": "🟡",
+                "rejected": "❌",
+                "weak_nocote": "🎯",
+                "medium_nocote": "🎯",
+            };
+            const labels = {
+                "strong": "STRONG",
+                "medium": "MEDIUM",
+                "weak": "WEAK",
+                "rejected": "REJECTED",
+                "weak_nocote": "NOCOTE MOYEN",
+                "medium_nocote": "NOCOTE FORT",
+            };
+            return `<span class="badge badge-${s}">${icons[s] || '?'} ${labels[s] || s.toUpperCase()}</span>`;
+        }
+        function getMarketBadge(m) {
+            const isUnder = (m.mise_under || 0) > 0;
+            const isOver = (m.mise_kelly || 0) > 0;
+            
+            if (isUnder) {
+                return `<span class="badge" style="background: rgba(239,7,42,0.2); color: #EF072A;">🎯 UNDER</span>`;
+            }
+            if (isOver) {
+                return `<span class="badge" style="background: rgba(0,123,255,0.2); color: #007BFF;">🎯 OVER</span>`;
+            }
+            return signalBadge(m.signal_strength);
+        }
+
+        function fmtMoney(v) { return (v || 0).toFixed(2) + '€'; }
+        function edgeColor(v) { return v > 0 ? 'text-accent' : v < 0 ? 'text-danger' : 'text-neutral-400'; }
+
+        function renderMatchRow(m) {
+            const isWon = m.result_verdict === '✓';
+            const isLost = m.result_verdict === '×';
+            const probaPct = Math.round((m.proba_over || 0) * 100);
+            const edgePct = ((m.edge || 0) * 100);
+            const edgeStr = (edgePct >= 0 ? '+' : '') + edgePct.toFixed(2) + '%';
+            const kickoff = m.kickoff || '';
+            const isLive = m.status === 'live' || m.status === 'inprogress';
+            const isFuture = !m.result_verdict && !isLive;
+
+            let statusBadge = '';
+            if (isWon) statusBadge = '<span class="text-lg">✅</span>';
+            else if (isLost) statusBadge = '<span class="text-lg">❌</span>';
+            else if (isLive) statusBadge = '<span class="badge badge-live">● LIVE</span>' + (m.home_score != null && m.away_score != null ? ' <span class="mono text-[10px] font-bold text-red-400">' + m.home_score + '-' + m.away_score + '</span>' : '');
+            else if (isFuture) statusBadge = '<span class="badge badge-soon">⏳ À venir</span>';
+
+            // Formater l'heure (extrait HH:MM)
+            let timeStr = '';
+            if (kickoff) {
+                try {
+                    const d = new Date(kickoff);
+                    timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                } catch(e) { timeStr = ''; }
+            }
+
+            return `
+                <div class="match-row" data-market-type="match" data-mise-over="${m.mise_kelly || 0}" data-mise-under="${m.mise_under || 0}" data-mise-btts="${m.mise_btts || 0}" onclick="openMatch(${m.match_id})">
+                    <div class="match-header">
+                        <div class="flex items-center gap-2 min-w-0">${getMarketBadge(m)} ${statusBadge}</div>
+                        <div class="flex items-center gap-2">
+                            ${timeStr ? `<span class="match-time">${timeStr}</span>` : ''}
+                            ${m.result_verdict ? `<span class="mono text-[10px] text-neutral-400">${(m.result && m.result.home_score != null) ? m.result.home_score : '?'}-${(m.result && m.result.away_score != null) ? m.result.away_score : '?'}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-baseline justify-between gap-3 mb-2">
+                        <div class="text-sm font-bold text-white truncate">${m.home} <span class="text-neutral-500 font-normal">vs</span> ${m.away}</div>
+                        <div class="text-right shrink-0">
+                            <div class="text-[9px] text-neutral-500 uppercase tracking-widest">VS</div>
+                            <div class="mono text-sm font-extrabold text-white score-value ${(m.score || 0) >= 6 ? 'high' : ''}">${parseFloat(m.score || 0).toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1.5">
+                        <div class="text-center"><div class="text-[9px] text-neutral-500 uppercase tracking-widest">Proba</div><div class="mono text-xs font-bold text-white">${probaPct}%</div></div>
+                        <div class="text-center"><div class="text-[9px] text-neutral-500 uppercase tracking-widest">Edge</div><div class="mono text-xs font-bold ${edgeColor(edgePct)}">${edgeStr}</div></div>
+                        <div class="text-center"><div class="text-[9px] text-neutral-500 uppercase tracking-widest">Cote</div><div class="mono text-xs font-bold text-white">${parseFloat(m.cote_over || 0).toFixed(2)}</div></div>
+                        <div class="text-center"><div class="text-[9px] text-neutral-500 uppercase tracking-widest">Mise</div><div class="mono text-xs font-bold text-accent">${fmtMoney(m.mise_kelly)}</div></div>
+                    </div>
+                </div>`;
+        }
+
+        function renderMatchesCard(matches) {
+            if (!matches || matches.length === 0) return `<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match</div>`;
+            const byLeague = {};
+            matches.forEach(m => {
+                const key = m.league_name || m.league_id || 'Autres';
+                if (!byLeague[key]) byLeague[key] = [];
+                byLeague[key].push(m);
+            });
+            let html = '<div class="card overflow-hidden fade-in">';
+            let first = true;
+            for (const [league, list] of Object.entries(byLeague)) {
+                html += `<div class="league-header" ${first ? 'style="border-top:none;"' : ''}>
+                    <span>${league}</span>
+                    <span class="mono text-[9px] text-neutral-500 normal-case tracking-normal font-medium">${list.length} match${list.length > 1 ? 's' : ''}</span>
+                </div>`;
+                first = false;
+                html += list.map(renderMatchRow).join('');
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function renderComingSoon(marketName, desc) {
+            return `<div class="card fade-in">
+                <div class="coming-soon">
+                    <div class="icon">🚧</div>
+                    <div class="title">${marketName}</div>
+                    <div class="desc">${desc || 'Bientôt disponible'}</div>
+                </div>
+            </div>`;
+        }
+
+                // ========== MODALE MATCH ==========
+        async function openMatch(matchId) {
+            document.getElementById('match-modal').classList.remove('hidden');
+            document.getElementById('modal-content').innerHTML = '<div class="loading-shimmer h-40 rounded-lg"></div>';
+            
+            try {
+                const r = await fetch('/api/match/' + matchId);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                const m = data.match || {};
+                
+                document.getElementById('modal-title').textContent = (m.home || '?') + ' vs ' + (m.away || '?');
+                
+                const weather = data.weather || {};
+                let html = '';
+
+                // === CARTES JOUEURS CLÉS (en haut) ===
+                const topPlayers = data.top_players || {};
+                html += '<div class="star-cards">';
+                for (const side of ['home', 'away']) {
+                    const players = topPlayers[side] || [];
+                    const star = players.length > 0 ? players[0] : null;
+                    const starName = star ? star.name : '—';
+                    const initial = starName.substring(0, 2).toUpperCase();
+                    html += '<div class="star-card">';
+                    html += '  <div class="star-card-img-wrapper" id="star-card-' + side + '"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:#4ade80;font-size:24px;font-weight:700;">' + initial + '</div></div>';
+                    html += '  <div class="star-card-info">';
+                    html += '    <div class="star-card-name">' + starName + '</div>';
+                    html += '    <div class="star-card-badge">⭐ Joueur clé</div>';
+                    html += '  </div>';
+                    html += '</div>';
+                }
+                html += '</div>';
+                
+                // En-tête
+                html += '<div class="grid grid-cols-3 gap-2 text-sm">';
+                html += '<div class="bg-bg/50 rounded-lg p-3 text-center"><div class="text-[9px] text-neutral-500 uppercase">Heure</div><div class="mono text-sm font-bold text-white mt-1">' + (m.kickoff || '').slice(11, 16) + '</div></div>';
+                html += '<div class="bg-bg/50 rounded-lg p-3 text-center"><div class="text-[9px] text-neutral-500 uppercase">Météo</div><div class="text-sm font-bold text-white mt-1">' + (weather.description || '—') + '</div></div>';
+                html += '<div class="bg-bg/50 rounded-lg p-3 text-center"><div class="text-[9px] text-neutral-500 uppercase">Temp.</div><div class="mono text-sm font-bold text-white mt-1">' + (weather.temperature_c || '?') + '°C</div></div>';
+                html += '</div>';
+                
+                // Score + équipes
+                html += '<div class="bg-bg/50 rounded-lg p-4">';
+                html += '  <div class="flex items-center justify-between gap-2">';
+                html += '    <div class="flex flex-col items-center flex-1 min-w-0">';
+                html += '      <div class="relative">';
+                html += '        <div class="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center text-lg font-bold text-white" id="home-avatar">' + (m.home || '?').substring(0, 2).toUpperCase() + '</div>';
+                html += '        <img src="" alt="" class="w-8 h-8 rounded-full border-2 border-accent absolute -bottom-1 -right-1 bg-neutral-900 object-cover" id="home-star-avatar" style="display:none;" />';
+                html += '      </div>';
+                html += '      <div class="text-xs font-bold text-white mt-2 text-center leading-tight">' + (m.home || '?') + '</div>';
+                html += '    </div>';
+                html += '    <div class="flex flex-col items-center px-2">';
+                html += '      <div class="mono text-3xl font-extrabold text-accent">' + (m.score || 0).toFixed(2) + '</div>';
+                html += '      <div class="text-[9px] text-neutral-500 uppercase">VS</div>';
+                html += '      <div class="mt-1">' + signalBadge(m.signal_strength) + '</div>';
+                html += '    </div>';
+                html += '    <div class="flex flex-col items-center flex-1 min-w-0">';
+                html += '      <div class="relative">';
+                html += '        <div class="w-14 h-14 rounded-full bg-neutral-800 flex items-center justify-center text-lg font-bold text-white" id="away-avatar">' + (m.away || '?').substring(0, 2).toUpperCase() + '</div>';
+                html += '        <img src="" alt="" class="w-8 h-8 rounded-full border-2 border-accent absolute -bottom-1 -right-1 bg-neutral-900 object-cover" id="away-star-avatar" style="display:none;" />';
+                html += '      </div>';
+                html += '      <div class="text-xs font-bold text-white mt-2 text-center leading-tight">' + (m.away || '?') + '</div>';
+                html += '    </div>';
+                html += '  </div>';
+                html += '</div>';
+                
+                // Vue terrain (compositions)
+                html += '<div id="pitch-container"></div>';
+                
+                // Signaux Under (si L47 a des warnings)
+                const l47 = (m.layers || {}).get("47");
+                const l47_warnings = (m.layers_warnings || {}).get("47") || [];
+                if (l47 !== undefined && l47_warnings.length > 0) {
+                    html += '<div class="bg-bg/50 rounded-lg p-3">';
+                    html += '<div class="text-[10px] text-neutral-500 uppercase mb-2">🔻 Signaux Under (L47 = ' + l47.toFixed(1) + ')</div>';
+                    html += '<div class="space-y-1">';
+                    l47_warnings.forEach(w => {
+                        html += '<div class="text-xs text-blue-400">✓ ' + w + '</div>';
+                    });
+                    html += '</div></div>';
+                }
+
+                // Classements
+                const homeP = data.home_position || {};
+                const awayP = data.away_position || {};
+                html += '<div><div class="text-[10px] text-neutral-500 uppercase mb-2">🏆 Classements</div><div class="space-y-1">';
+                html += '<div class="flex justify-between items-center bg-bg/30 rounded-lg p-2 text-sm"><span class="font-bold text-white">' + m.home + '</span><span class="mono text-accent">' + (homeP.position || '?') + 'e (' + (homeP.points || '?') + ' pts)</span></div>';
+                html += '<div class="flex justify-between items-center bg-bg/30 rounded-lg p-2 text-sm"><span class="font-bold text-white">' + m.away + '</span><span class="mono text-accent">' + (awayP.position || '?') + 'e (' + (awayP.points || '?') + ' pts)</span></div>';
+                html += '</div></div>';
+                
+                document.getElementById('modal-content').innerHTML = html;
+                
+                // Charger les logos en async
+                // Charger les logos directement depuis match_data (IDs Bzzoiro)
+                loadTeamLogos(m.home_team_id, m.away_team_id, m.home, m.away);
+                loadStarPlayers(data.top_players, m.home, m.away);
+                if (m.match_id) loadMatchLineup(m.match_id, 'pitch-container');
+            } catch (e) {
+                document.getElementById('modal-content').innerHTML = '<div class="text-center text-danger p-4">Erreur: ' + e.message + '</div>';
+            }
+        }
+
+        function filterByMarket(market) {
+            // Mettre à jour currentMarket
+            currentMarket = market;
+            
+            // Toggle active sur les boutons
+            document.querySelectorAll('.market-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.market === market);
+            });
+            
+            // Toggle active sur le bouton Paris du Jour
+            const btnParis = document.querySelector('.btn-paris-jour');
+            if (btnParis) btnParis.classList.toggle('active', market === 'paris-jour');
+            
+            // Filtrer les cards
+            const cards = document.querySelectorAll('[data-market-type]');
+            let visible = 0;
+            cards.forEach(card => {
+                let show = false;
+                if (market === 'all') show = true;
+                else if (market === 'over') show = card.dataset.miseOver > 0;
+                else if (market === 'under') show = card.dataset.miseUnder > 0;
+                else if (market === 'btts') show = card.dataset.miseBtts > 0;
+                else if (market === '1x2') show = false;
+                else if (market === 'paris-jour') {
+                    // Afficher TOUS les matchs analysés (même REJECTED, sans cote, etc.)
+                    show = true;
+                }
+                card.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            
+            const empty = document.getElementById('empty-filter');
+            if (empty) empty.style.display = visible === 0 ? 'block' : 'none';
+        }
+
+        
+        function openParisJour() {
+            const el = document.getElementById('paris-jour-view');
+            if (el) el.remove();
+
+            const view = document.createElement('div');
+            view.id = 'paris-jour-view';
+
+            fetch('/api/predictions')
+                .then(r => r.json())
+                .then(data => {
+                    const allMatches = data.matches || [];
+                    const paris = allMatches.filter(m => 
+                        (Number(m.mise_kelly || 0) > 0) || (Number(m.mise_under || 0) > 0)
+                    );
+
+                    let coteTotale = 1;
+                    let rows = '';
+                    let nbParis = 0;
+
+                    paris.forEach(m => {
+                        const isOver = (Number(m.mise_kelly) || 0) > 0;
+                        const mise = isOver ? m.mise_kelly : m.mise_under;
+                        const cote = isOver ? m.cote_over : m.cote_under;
+                        
+                        if (cote) {
+                            coteTotale *= Number(cote);
+                            nbParis++;
+                        }
+
+                        rows += `<tr>
+                            <td><strong>${m.home}</strong> vs ${m.away}</td>
+                            <td>${isOver ? '<span style="color:var(--blue-electric)">Over</span>' : '<span style="color:var(--red-neon)">Under</span>'}</td>
+                            <td>${cote ? Number(cote).toFixed(2) : '—'}</td>
+                            <td>${Number(mise).toFixed(2)}€</td>
+                        </tr>`;
+                    });
+
+                    const montantBaseFC = 2000;
+                    const gainTotalFC = coteTotale * montantBaseFC;
+
+                    view.innerHTML = `
+                        <div style="display:flex; align-items:center; margin-bottom:20px;">
+                            <button class="btn-return" onclick="document.getElementById('paris-jour-view').remove()">← Retour</button>
+                            <h2 style="margin-left:16px; font-size:20px; font-weight:800; color:white;">🎯 Paris du Jour</h2>
+                        </div>
+
+                        <table class="pari-table">
+                            <thead><tr><th>Match</th><th>Marché</th><th>Cote</th><th>Mise</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+
+                        <div class="pari-total">
+                            <div class="pari-total-row"><span>Nombre de paris</span><strong>${nbParis}</strong></div>
+                            <div class="pari-total-row"><span>Cote totale</span><strong>${coteTotale.toFixed(2)}</strong></div>
+                            <div class="pari-total-row"><span>Mise de base</span><strong>${montantBaseFC.toLocaleString()} FC</strong></div>
+                            <div class="pari-total-row big"><span>Gain potentiel</span><strong>${gainTotalFC.toLocaleString()} FC</strong></div>
+                        </div>
+                    `;
+                    
+                    // Ajouter la vue au DOM
+                    document.body.appendChild(view);
+                })
+                .catch(e => alert("Erreur: " + e.message));
+        }
+
+        function closeModal() {
+            document.getElementById('match-modal').classList.add('hidden');
+        }
+
+        function showCollection(date) {
+            const day = historyData.find(d => d.date === date);
+            if (!day || !day.matches) return;
+            
+            const bets = day.matches.filter(m => (m.mise_kelly > 0 || m.mise_under > 0));
+            if (bets.length === 0) {
+                alert("Aucun pari pour cette journée.");
+                return;
+            }
+
+            let html = '<div class="p-4">';
+            html += '<h3 class="text-lg font-bold text-white mb-4">📦 Collection du ' + date + '</h3>';
+            
+            html += '<table class="collection-table">';
+            html += '<thead><tr><th>Match</th><th>Marché</th><th>Cote</th><th>Mise</th><th>Résultat</th></tr></thead>';
+            html += '<tbody>';
+            
+            let totalMise = 0;
+            let totalGain = 0;
+            let gagnes = 0, perdus = 0, pending = 0;
+
+            bets.forEach(m => {
+                const isOver = (m.mise_kelly || 0) > 0;
+                const mise = isOver ? m.mise_kelly : m.mise_under;
+                const cote = isOver ? m.cote_over : m.cote_under;
+                const verdict = m.result_verdict;
+                
+                let gain = 0;
+                let rowClass = '';
+                if (verdict === '✓') { 
+                    gain = mise * ((cote || 1) - 1); 
+                    gagnes++; 
+                    rowClass = 'win';
+                } else if (verdict === '×') { 
+                    gain = -mise; 
+                    perdus++; 
+                    rowClass = 'loss';
+                } else {
+                    pending++;
+                }
+                
+                totalMise += mise;
+                totalGain += gain;
+
+                html += '<tr class="' + rowClass + '">';
+                html += '<td>' + m.home + ' vs ' + m.away + '</td>';
+                html += '<td>' + (isOver ? 'Over 2.5' : 'Under 2.5') + '</td>';
+                html += '<td class="mono">' + (cote ? cote.toFixed(2) : '—') + '</td>';
+                html += '<td class="mono">' + mise.toFixed(2) + '€</td>';
+                html += '<td class="mono font-bold ' + (verdict === '✓' ? 'text-green-400' : verdict === '×' ? 'text-red-400' : 'text-yellow-400') + '">' + (verdict || '⏳') + '</td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            
+            // Tableau total
+            const gainFC = totalGain * 2300;  // 1$ = 2300 FC
+            const miseFC = totalMise * 2300;
+            
+            html += '<div class="collection-total">';
+            html += '<div class="collection-total-row"><span>Paris gagnés</span><span class="text-green-400 font-bold">' + gagnes + ' ✓</span></div>';
+            html += '<div class="collection-total-row"><span>Paris perdus</span><span class="text-red-400 font-bold">' + perdus + ' ×</span></div>';
+            if (pending > 0) html += '<div class="collection-total-row"><span>En attente</span><span class="text-yellow-400 font-bold">' + pending + ' ⏳</span></div>';
+            html += '<div class="collection-total-row"><span>Mise totale</span><span class="mono">' + totalMise.toFixed(2) + '€ / ' + miseFC.toLocaleString() + ' FC</span></div>';
+            html += '<div class="collection-total-row big"><span>Gain / Perte</span><span class="mono ' + (totalGain >= 0 ? 'text-green-400' : 'text-red-400') + '">' + (totalGain >= 0 ? '+' : '') + totalGain.toFixed(2) + '€ / ' + gainFC.toLocaleString() + ' FC</span></div>';
+            html += '</div>';
+            
+            html += '</div>';
+
+            document.getElementById('match-modal').classList.remove('hidden');
+            document.getElementById('modal-title').textContent = 'Collection ' + date;
+            document.getElementById('modal-content').innerHTML = html;
+        }
+
+        async function loadMatchLineup(matchId, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '<div class="text-center text-xs text-neutral-500 py-4">⏳ Chargement compositions...</div>';
+            
+            try {
+                const r = await fetch('/api/match-lineup/' + matchId);
+                if (!r.ok) {
+                    container.innerHTML = '<div class="text-center text-xs text-neutral-500 py-4">Compositions non disponibles</div>';
+                    return;
+                }
+                const data = await r.json();
+                if (data.error) {
+                    container.innerHTML = '<div class="text-center text-xs text-neutral-500 py-4">' + data.error + '</div>';
+                    return;
+                }
+                
+                let html = '<div class="pitch-pro">';
+                html += '<div class="pitch-lines"></div>';
+                html += renderPitchTeam(data.home, 'home');
+                html += renderPitchTeam(data.away, 'away');
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div class="text-center text-xs text-danger py-4">Erreur: ' + e.message + '</div>';
+            }
+        }
+
+        function renderPitchTeam(team, side) {
+            if (!team) return '';
+            const formation = team.formation || '4-4-2';
+            const players = team.players || [];
+            
+            // Grouper par position
+            const byPos = { G: [], D: [], M: [], A: [] };
+            players.forEach(p => {
+                const pos = (p.position || 'M').toUpperCase();
+                if (byPos[pos]) byPos[pos].push(p);
+                else byPos.M.push(p);
+            });
+            
+            let html = '<div class="pitch-team">';
+            
+            // En-tête équipe
+            html += '<div class="pitch-team-header">';
+            if (team.logo) {
+                html += '<img src="' + team.logo + '" class="pitch-team-logo" alt="' + team.team_name + '" />';
+            } else {
+                html += '<div class="pitch-team-logo bg-neutral-700 rounded-full flex items-center justify-center text-[8px] font-bold">' + (team.team_name || '?').substring(0,2).toUpperCase() + '</div>';
+            }
+            html += '<span class="pitch-team-name">' + (team.team_name || '?') + '</span>';
+            html += '<span class="pitch-formation">' + formation + '</span>';
+            html += '</div>';
+            
+            // Ordre d'affichage selon le côté :
+            // HOME : A → M → D → G (attaquants en haut, gardien en bas)
+            // AWAY : G → D → M → A (gardien en haut, attaquants en bas)
+            const order = side === 'home' ? ['A', 'M', 'D', 'G'] : ['G', 'D', 'M', 'A'];
+            
+            for (const pos of order) {
+                const posPlayers = byPos[pos] || [];
+                if (posPlayers.length === 0) continue;
+                
+                html += '<div class="pitch-row">';
+                posPlayers.forEach(p => {
+                    html += renderPitchPlayer(p);
+                });
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function renderPitchPlayer(p) {
+            const captainClass = p.is_captain ? ' is-captain' : '';
+            const initial = (p.short_name || p.name || '?').substring(0, 2).toUpperCase();
+            const playerId = p.id;
+            const photoUrl = playerId ? 'https://sports.bzzoiro.com/img/player/' + playerId + '/' : null;
+            const name = p.short_name || p.name || '?';
+            
+            let html = '<div class="pitch-player-pro' + captainClass + '">';
+            if (p.number) {
+                html += '<span class="p-num">' + p.number + '</span>';
+            }
+            if (photoUrl) {
+                html += '<img src="' + photoUrl + '" alt="' + name + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';" />';
+                html += '<div style="display:none; width:40px; height:40px; border-radius:50%; background:#111; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:white; border:2px solid rgba(255,255,255,0.3); margin-bottom:4px;">' + initial + '</div>';
+            } else {
+                html += '<div style="display:flex; width:40px; height:40px; border-radius:50%; background:#111; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:white; border:2px solid rgba(255,255,255,0.3); margin-bottom:4px;">' + initial + '</div>';
+            }
+            html += '<div class="p-name-box">' + name + '</div>';
+            html += '</div>';
+            return html;
+        }
+
+        async function loadStarPlayers(topPlayers, homeName, awayName) {
+            if (!topPlayers) return;
+            for (const side of ['home', 'away']) {
+                const players = topPlayers[side] || [];
+                if (players.length === 0) continue;
+                const star = players[0];
+                const teamName = side === 'home' ? homeName : awayName;
+                const el = document.getElementById('star-card-' + side);
+                if (!el) continue;
+                
+                // 1. Essayer photo custom (DB)
+                try {
+                    const url = '/api/player-photo-custom?id=' + (star.id || '') + '&name=' + encodeURIComponent(star.name || '');
+                    const r = await fetch(url);
+                    if (r.ok) {
+                        const d = await r.json();
+                        if (d.photo) {
+                            el.innerHTML = '<img src="' + d.photo + '" class="star-card-photo" alt="' + (star.name || '') + '" />';
+                            continue;
+                        }
+                    }
+                } catch (e) {}
+                
+                // 2. Fallback FotMob (auto)
+                try {
+                    const url2 = '/api/player-photo-fotmob?name=' + encodeURIComponent(star.name || '') + '&team=' + encodeURIComponent(teamName);
+                    const r2 = await fetch(url2);
+                    if (r2.ok) {
+                        const d2 = await r2.json();
+                        if (d2.photo) {
+                            el.innerHTML = '<img src="' + d2.photo + '" class="star-card-photo" alt="' + (star.name || '') + '" />';
+                            continue;
+                        }
+                    }
+                } catch (e) {}
+                
+                // 3. Fallback Bzzoiro
+                if (star.id) {
+                    el.innerHTML = '<img src="https://sports.bzzoiro.com/img/player/' + star.id + '/' + '" class="star-card-photo" alt="' + (star.name || '') + '" onerror="this.style.display=\'none\'" />';
+                }
+            }
+        }
+
+        async function loadTeamLogos(homeId, awayId, homeName, awayName) {
+            try {
+                if (homeId) {
+                    const el = document.getElementById('home-avatar');
+                    if (el) el.innerHTML = '<img src="https://sports.bzzoiro.com/img/team/' + homeId + '/?bg=transparent" class="w-14 h-14 object-contain p-2" alt="' + (homeName || '') + '" />';
+                }
+                if (awayId) {
+                    const el = document.getElementById('away-avatar');
+                    if (el) el.innerHTML = '<img src="https://sports.bzzoiro.com/img/team/' + awayId + '/?bg=transparent" class="w-14 h-14 object-contain p-2" alt="' + (awayName || '') + '" />';
+                }
+            } catch (e) {
+                console.warn('Logos indisponibles:', e);
+            }
+        }
+
+async function loadHomeForDate(date) {
+            if (!date) return;
+            const el = document.getElementById('home-content');
+            el.innerHTML = '<div class="card p-6 text-center text-neutral-400">Chargement...</div>';
+            try {
+                const r = await fetch('/api/predictions?date=' + date);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const matches = await r.json();
+                if (!matches || matches.length === 0) {
+                    el.innerHTML = '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match pour cette date</div>';
+                    return;
+                }
+                renderMatchesCard(matches);
+            } catch (e) {
+                el.innerHTML = '<div class="card p-6 text-center text-red-400 text-sm">Erreur : ' + e.message + '</div>';
+            }
+        }
+
+        async function loadHome() {
+            const el = document.getElementById('home-content');
+            document.getElementById('home-count').textContent = '';
+            if (currentMarket === '1x2') { el.innerHTML = renderComingSoon('1X2 (victoire/nul/défaite)'); return; }
+            if ((currentMarket === 'over' || currentMarket === 'under') && currentScore !== 2.5) {
+                el.innerHTML = renderComingSoon(`${currentMarket === 'over' ? 'Over' : 'Under'} ${currentScore}`, 'Le moteur ne calcule actuellement que le 2.5');
+                return;
+            }
+            try {
+                const r = await fetch('/api/predictions');
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                let matches = data.matches || data.predictions || [];
+                
+                // === BANDEAU PARI DU JOUR ===
+                let bannerHTML = '';
+                if (currentMarket === 'paris-jour') {
+                    const paris = matches.filter(m => (m.mise_kelly || 0) > 0 || (m.mise_under || 0) > 0);
+                    const cotes = paris.map(m => {
+                        if ((m.mise_kelly || 0) > 0 && m.cote_over) return m.cote_over;
+                        if ((m.mise_under || 0) > 0 && m.cote_under) return m.cote_under;
+                        return null;
+                    }).filter(c => c !== null);
+                    
+                    const coteTotale = cotes.reduce((acc, c) => acc * c, 1);
+                    const miseFC = paris.reduce((acc, m) => acc + ((m.mise_kelly || 0) + (m.mise_under || 0)) * 2300, 0); // 1$ = 2300 FC
+                    const gainFC = miseFC * coteTotale;
+                    
+                    bannerHTML = `
+                        <div class="pari-du-jour-header">
+                            <h3>🎯 Paris du Jour</h3>
+                            <div class="pari-du-jour-row"><span>Nombre de paris</span><strong>${paris.length}</strong></div>
+                            <div class="pari-du-jour-row"><span>Cote totale</span><strong>${coteTotale.toFixed(2)}</strong></div>
+                            <div class="pari-du-jour-row"><span>Mise totale</span><strong>${miseFC.toLocaleString()} FC</strong></div>
+                            <div class="pari-du-jour-row"><span>Gain potentiel</span><strong>${gainFC.toLocaleString()} FC</strong></div>
+                        </div>
+                    `;
+                }
+                
+                // Filtrer selon le marché (mises, pas probas)
+                if (currentMarket === 'over') {
+                    matches = matches.filter(m => Number(m.mise_kelly || 0) > 0);
+                } else if (currentMarket === 'under') {
+                    matches = matches.filter(m => Number(m.mise_under || 0) > 0);
+                } else if (currentMarket === 'btts') {
+                    matches = matches.filter(m => Number(m.mise_btts || 0) > 0);
+                } else if (currentMarket === 'paris-jour') {
+                    matches = matches.filter(m => Number(m.mise_kelly || 0) > 0 || Number(m.mise_under || 0) > 0);
+                }
+                // 'all' → tous les matchs
+
+                document.getElementById('home-count').textContent = matches.length + ' match' + (matches.length > 1 ? 's' : '');
+                if (matches.length === 0) { 
+                    el.innerHTML = bannerHTML + `<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match pour ce marché</div>`; 
+                    return; 
+                }
+                el.innerHTML = bannerHTML + renderMatchesCard(matches);
+                // Filtrer selon le marché actif
+                filterByMarket(currentMarket);
+            } catch (e) {
+                console.error('loadHistory error:', e);
+                el.innerHTML = `<div class="card p-6 text-center"><div class="text-4xl mb-2">📡</div><div class="text-sm text-neutral-400 font-medium">Erreur: ${e.message}</div></div>`;
+            }
+        }
+
+        let historyFilter = 'all';
+        let historyData = [];
+
+        function filterHistory(filter) {
+            historyFilter = filter;
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const el = document.getElementById('history-content');
+            if (!historyData || historyData.length === 0) {
+                el.innerHTML = '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun historique</div>';
+                return;
+            }
+
+            let html = '';
+            historyData.forEach((d, idx) => {
+                let matches = d.matches || [];
+
+                // Garde tous les matchs (pas de filtre mise)
+                if (matches.length === 0) return;
+
+                // Filtre marché
+                if (currentMarket === 'over') matches = matches.filter(m => Number(m.mise_kelly || 0) > 0);
+                else if (currentMarket === 'under') matches = matches.filter(m => Number(m.mise_under || 0) > 0);
+                else if (currentMarket === 'btts') matches = matches.filter(m => Number(m.mise_btts || 0) > 0);
+
+                const correct = matches.filter(m => m.result_verdict === '✓').length;
+                const wrong = matches.filter(m => m.result_verdict === '×').length;
+                const pending = matches.filter(m => !m.result_verdict).length;
+
+                // Statut global
+                let status = 'pending';
+                let badgeLabel = '⏳ En cours';
+                if (pending === 0 && correct > 0 && wrong === 0) {
+                    status = 'win';
+                    badgeLabel = '✓ Gagné';
+                } else if (pending === 0 && wrong > 0) {
+                    status = 'loss';
+                    badgeLabel = '× Perdu';
+                }
+
+                // Profit total (simulé, basé sur les mises)
+                const totalMise = matches.reduce((acc, m) => acc + (m.mise_kelly || 0) + (m.mise_under || 0), 0);
+                const profit = matches.reduce((acc, m) => {
+                    if (m.result_verdict === '✓') {
+                        if ((m.mise_kelly || 0) > 0 && m.cote_over) return acc + (m.mise_kelly * (m.cote_over - 1));
+                        if ((m.mise_under || 0) > 0 && m.cote_under) return acc + (m.mise_under * (m.cote_under - 1));
+                    } else if (m.result_verdict === '×') {
+                        return acc - ((m.mise_kelly || 0) + (m.mise_under || 0));
+                    }
+                    return acc;
+                }, 0);
+                
+                // Aperçu : 3 premiers matchs
+                let preview = '';
+                matches.slice(0, 3).forEach(m => {
+                    const isUnder = (m.mise_under || 0) > 0;
+                    const mise = isUnder ? m.mise_under : m.mise_kelly;
+                    const cote = isUnder ? m.cote_under : m.cote_over;
+                    const verdict = m.result_verdict || '⏳';
+                    const verdictColor = verdict === '✓' ? 'text-green-400' : verdict === '×' ? 'text-red-400' : 'text-yellow-400';
+                    preview += `<div class="history-preview-row"><span>${m.home} vs ${m.away}</span><span class="mono">${isUnder ? 'U' : 'O'} ${cote ? cote.toFixed(2) : '—'} · <span class="${verdictColor} font-bold">${verdict}</span></span></div>`;
+                });
+
+                html += `
+                    <div class="history-card-pro ${status}" onclick="showCollection('${d.date}')" style="animation-delay: ${idx * 0.1}s">
+                        <div class="history-header-pro">
+                            <div class="history-date-pro">${d.date || '?'}</div>
+                            <span class="history-badge-pro ${status}">${badgeLabel}</span>
+                        </div>
+                        <div class="history-preview-pro">${preview}</div>
+                        <div class="history-header-pro" style="border-bottom:none; padding-top:8px; padding-bottom:8px;">
+                            <div class="text-[10px] text-neutral-500">${matches.length} paris · Mise ${totalMise.toFixed(2)}€</div>
+                            <div class="history-profit-pro ${profit >= 0 ? 'positive' : 'negative'}">${profit >= 0 ? '+' : ''}${profit.toFixed(2)}€</div>
+                        </div>
+                        <div class="history-cta">
+                            <button class="history-cta-btn">Voir la collection →</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (html === '') {
+                html = '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match pour ce filtre</div>';
+            }
+            el.innerHTML = html;
+        }
+
+        async function loadHistory() {
+            const el = document.getElementById('history-content');
+            try {
+                const r = await fetch('/api/archive');
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                const days = data.days || data.archive || [];
+                historyData = days;
+                let totalCorrect = 0, totalWrong = 0;
+                days.forEach(d => { totalCorrect += d.correct || 0; totalWrong += d.wrong || 0; });
+                document.getElementById('stat-correct').textContent = totalCorrect;
+                document.getElementById('stat-wrong').textContent = totalWrong;
+                const total = totalCorrect + totalWrong;
+                document.getElementById('stat-accuracy').textContent = total > 0 ? Math.round((totalCorrect / total) * 100) + '%' : '—';
+                
+                renderHistory();
+            } catch (e) {
+                el.innerHTML = `<div class="card p-6 text-center"><div class="text-4xl mb-2">📡</div><div class="text-sm text-neutral-400 font-medium">Serveur non joignable</div></div>`;
+            }
+        }
+
+        async function handleAnalyze(btn) {
+            if (btn.classList.contains('loading')) return;
+            btn.classList.add('loading');
+            btn.innerHTML = '⏳ Analyse...';
+            try {
+                await startAnalyze();
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = '🔍 Analyser';
+            }
+        }
+
+        async function startAnalyze() {
+            try {
+                const r = await fetch('/api/analyze/start', { method: 'POST' });
+                const data = await r.json();
+                if (data.success) setTimeout(loadHome, 3000);
+            } catch (e) { alert('Erreur: ' + e.message); }
+        }
+
+        async function verifyResults() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                await fetch('/api/resultats/' + today);
+                setTimeout(loadHistory, 2000);
+            } catch (e) { alert('Erreur: ' + e.message); }
+        }
+
+        // Init date picker sur la dernière date enrichie
+        (async () => {
+            try {
+                const r = await fetch('/api/archive?limit=1');
+                const data = await r.json();
+                const days = data.days || [];
+                if (days.length > 0) {
+                    const dp = document.getElementById('date-picker');
+                    if (dp) dp.value = days[0].date;
+                }
+            } catch (e) {}
+        })();
+
+        loadHome();
+        filterByMarket('all');
+    </script>
+
+    <!-- ========== MODALE MATCH DÉTAILS ========== -->
+    <div id="match-modal" class="hidden fixed inset-0 z-50 bg-black/80 overflow-y-auto modal-backdrop">
+        <div class="max-w-2xl mx-auto my-8 bg-card rounded-xl p-4 modal-content border border-white/10">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="modal-title" class="text-lg font-bold text-white"></h2>
+                <button onclick="closeModal()" class="text-neutral-400 hover:text-white text-2xl transition">✕</button>
+            </div>
+            <div id="modal-content" class="space-y-4"></div>
+        </div>
+    </div>
+
+</body>
+</html>
