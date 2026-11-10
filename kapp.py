@@ -330,10 +330,16 @@ def api_stats():
 # ================================================================== #
 @app.route("/api/analyze/start", methods=["POST"])
 def api_analyze_start():
-    return jsonify({
-        "status": "stub",
-        "message": "kjob_analyse.py à coder",
-    })
+    try:
+        from jobs.kjob_analyse import analyse_du_jour
+        matches = analyse_du_jour()
+        return jsonify({
+            "status": "ok",
+            "n_matchs": len(matches),
+            "matchs": [{"home": m["home_team_name"], "away": m["away_team_name"]} for m in matches],
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 # ================================================================== #
@@ -341,11 +347,12 @@ def api_analyze_start():
 # ================================================================== #
 @app.route("/api/resultats/<date>")
 def api_resultats(date):
-    return jsonify({
-        "date": date,
-        "status": "stub",
-        "message": "kjob_verif.py à coder",
-    })
+    try:
+        from jobs.kjob_verif import verifier_resultats
+        verifier_resultats(date)
+        return jsonify({"status": "ok", "date": date})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 # ================================================================== #

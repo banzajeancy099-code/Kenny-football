@@ -45,8 +45,28 @@ except Exception as _e:
     print(f"[kengine] Impossible de charger leagues.json : {_e}")
 
 # Ligues typées (backtest: ROI +30,06% sur 249 paris)
-LEAGUES_OVER = {18, 17, 14, 54, 25, 19}   # Over prioritaire
-LEAGUES_UNDER = {34, 85, 89, 23, 53, 32}  # Under prioritaire
+LEAGUES_OVER = {
+    18,   # MLS
+    17,   # Süper Lig
+    14,   # Pro League BE
+    54,   # Eliteserien
+    25,   # Ekstraklasa
+    19,   # Liga MX
+    10,   # Eredivisie
+    108,  # Eerste Divisie
+    7,    # Champions League
+    8,    # Europa League
+}
+LEAGUES_UNDER = {
+    34,   # Brasileirão B
+    85,   # Argentine Primera
+    89,   # Ligue 2
+    23,   # Superliga ROU
+    53,   # Botola Pro
+    32,   # Copa Libertadores
+    94,   # 2. Bundesliga
+    84,   # Superliga DK
+}
 
 
 WEIGHTS = {
