@@ -1083,20 +1083,7 @@
                     <button data-market="1x2" class="market-btn">1X2</button>
 </div>
         </div>
-    <!-- Sélecteur de date -->
-    <div class="px-3 mb-3">
-        <div class="flex items-center gap-2 bg-card rounded-xl p-2 border border-white/10">
-            <span class="text-neutral-400 text-sm">📅</span>
-            <input type="date" id="date-picker" 
-                   class="flex-1 bg-transparent text-white text-sm outline-none"
-                   onchange="loadHomeForDate(this.value)">
-            <button onclick="loadHomeForDate(document.getElementById('date-picker').value)"
-                    class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
-                Charger
-            </button>
-        </div>
-    </div>
-
+    <!-- (sélecteur de date déplacé vers l'historique) -->
         <!-- Bouton Paris du Jour EN DESSOUS des filtres -->
         <div class="px-4 pt-3 pb-2">
             <button class="btn-paris-jour w-full" onclick="openParisJour()">🎯 Paris du Jour</button>
@@ -1831,91 +1818,93 @@
             }
         }
 
-async function loadHomeForDate(date) {
-            if (!date) return;
+async function loadHome() {
             const el = document.getElementById('home-content');
             el.innerHTML = '<div class="card p-6 text-center text-neutral-400">Chargement...</div>';
+            
             try {
-                const r = await fetch('/api/predictions?date=' + date);
+                const r = await fetch('/api/predictions');
                 if (!r.ok) throw new Error('HTTP ' + r.status);
-                const matches = await r.json();
-                if (!matches || matches.length === 0) {
-                    el.innerHTML = '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match pour cette date</div>';
-                    return;
+                const data = await r.json();
+                
+                let html = '';
+                
+                // === PARIS DU JOUR (top 10) ===
+                const paris = data.paris_du_jour || [];
+                html += `<div class="mb-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-xl font-bold text-white">🎯 Paris du Jour</h2>
+                        <span class="text-xs text-neutral-400">${paris.length} paris</span>
+                    </div>`;
+                
+                if (paris.length === 0) {
+                    html += '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun pari pour cette journée</div>';
+                } else {
+                    paris.forEach(m => {
+                        const badge = signalBadge(m.signal);
+                        const marketBadge = getMarketBadge(m.market);
+                        const cote = m.market === 'under' ? m.cote_under : m.cote_over;
+                        const edgePct = m.edge ? (m.edge * 100).toFixed(1) : '—';
+                        
+                        html += `<div class="card p-4 mb-2 cursor-pointer hover:bg-cardHover transition" onclick="openMatch('${m.match_id}')">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    ${badge}
+                                    ${marketBadge}
+                                </div>
+                                <span class="text-xs text-neutral-400">Ligue ${m.league_id}</span>
+                            </div>
+                            <div class="font-bold text-white mb-1">${m.home || '?'} vs ${m.away || '?'}</div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-neutral-400">${m.kickoff ? new Date(m.kickoff).toLocaleString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : ''}</span>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-accent font-bold">${cote ? cote.toFixed(2) : '—'}</span>
+                                    <span class="text-xs text-neutral-500">edge ${edgePct}%</span>
+                                    <span class="text-xs font-bold text-green-400">${m.mise.toFixed(2)}€</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    });
                 }
-                renderMatchesCard(matches);
+                html += '</div>';
+                
+                // === CONFIANCE MOYENNE ===
+                const moyenne = data.confiance_moyenne || [];
+                if (moyenne.length > 0) {
+                    html += `<div class="mb-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h2 class="text-lg font-bold text-neutral-300">⚡ Confiance moyenne</h2>
+                            <span class="text-xs text-neutral-500">${moyenne.length} matchs</span>
+                        </div>`;
+                    moyenne.forEach(m => {
+                        const badge = signalBadge(m.signal);
+                        const marketBadge = getMarketBadge(m.market);
+                        const cote = m.market === 'under' ? m.cote_under : m.cote_over;
+                        
+                        html += `<div class="card p-3 mb-2 cursor-pointer hover:bg-cardHover transition" onclick="openMatch('${m.match_id}')">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center gap-2">
+                                    ${badge}
+                                    ${marketBadge}
+                                </div>
+                            </div>
+                            <div class="text-sm font-medium text-neutral-300 mb-1">${m.home || '?'} vs ${m.away || '?'}</div>
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-neutral-500">Ligue ${m.league_id}</span>
+                                <span class="text-neutral-400">${cote ? cote.toFixed(2) : '—'}</span>
+                            </div>
+                        </div>`;
+                    });
+                    html += '</div>';
+                }
+                
+                el.innerHTML = html;
+                
             } catch (e) {
                 el.innerHTML = '<div class="card p-6 text-center text-red-400 text-sm">Erreur : ' + e.message + '</div>';
             }
         }
 
-        async function loadHome() {
-            const el = document.getElementById('home-content');
-            document.getElementById('home-count').textContent = '';
-            if (currentMarket === '1x2') { el.innerHTML = renderComingSoon('1X2 (victoire/nul/défaite)'); return; }
-            if ((currentMarket === 'over' || currentMarket === 'under') && currentScore !== 2.5) {
-                el.innerHTML = renderComingSoon(`${currentMarket === 'over' ? 'Over' : 'Under'} ${currentScore}`, 'Le moteur ne calcule actuellement que le 2.5');
-                return;
-            }
-            try {
-                const r = await fetch('/api/predictions');
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                const data = await r.json();
-                let matches = data.matches || data.predictions || [];
-                
-                // === BANDEAU PARI DU JOUR ===
-                let bannerHTML = '';
-                if (currentMarket === 'paris-jour') {
-                    const paris = matches.filter(m => (m.mise_kelly || 0) > 0 || (m.mise_under || 0) > 0);
-                    const cotes = paris.map(m => {
-                        if ((m.mise_kelly || 0) > 0 && m.cote_over) return m.cote_over;
-                        if ((m.mise_under || 0) > 0 && m.cote_under) return m.cote_under;
-                        return null;
-                    }).filter(c => c !== null);
-                    
-                    const coteTotale = cotes.reduce((acc, c) => acc * c, 1);
-                    const miseFC = paris.reduce((acc, m) => acc + ((m.mise_kelly || 0) + (m.mise_under || 0)) * 2300, 0); // 1$ = 2300 FC
-                    const gainFC = miseFC * coteTotale;
-                    
-                    bannerHTML = `
-                        <div class="pari-du-jour-header">
-                            <h3>🎯 Paris du Jour</h3>
-                            <div class="pari-du-jour-row"><span>Nombre de paris</span><strong>${paris.length}</strong></div>
-                            <div class="pari-du-jour-row"><span>Cote totale</span><strong>${coteTotale.toFixed(2)}</strong></div>
-                            <div class="pari-du-jour-row"><span>Mise totale</span><strong>${miseFC.toLocaleString()} FC</strong></div>
-                            <div class="pari-du-jour-row"><span>Gain potentiel</span><strong>${gainFC.toLocaleString()} FC</strong></div>
-                        </div>
-                    `;
-                }
-                
-                // Filtrer selon le marché (mises, pas probas)
-                if (currentMarket === 'over') {
-                    matches = matches.filter(m => Number(m.mise_kelly || 0) > 0);
-                } else if (currentMarket === 'under') {
-                    matches = matches.filter(m => Number(m.mise_under || 0) > 0);
-                } else if (currentMarket === 'btts') {
-                    matches = matches.filter(m => Number(m.mise_btts || 0) > 0);
-                } else if (currentMarket === 'paris-jour') {
-                    matches = matches.filter(m => Number(m.mise_kelly || 0) > 0 || Number(m.mise_under || 0) > 0);
-                }
-                // 'all' → tous les matchs
-
-                document.getElementById('home-count').textContent = matches.length + ' match' + (matches.length > 1 ? 's' : '');
-                if (matches.length === 0) { 
-                    el.innerHTML = bannerHTML + `<div class="card p-6 text-center text-neutral-500 text-sm">Aucun match pour ce marché</div>`; 
-                    return; 
-                }
-                el.innerHTML = bannerHTML + renderMatchesCard(matches);
-                // Filtrer selon le marché actif
-                filterByMarket(currentMarket);
-            } catch (e) {
-                console.error('loadHistory error:', e);
-                el.innerHTML = `<div class="card p-6 text-center"><div class="text-4xl mb-2">📡</div><div class="text-sm text-neutral-400 font-medium">Erreur: ${e.message}</div></div>`;
-            }
-        }
-
-        let historyFilter = 'all';
-        let historyData = [];
 
         function filterHistory(filter) {
             historyFilter = filter;
@@ -2005,24 +1994,142 @@ async function loadHomeForDate(date) {
 
         async function loadHistory() {
             const el = document.getElementById('history-content');
+            el.innerHTML = '<div class="card p-6 text-center text-neutral-400">Chargement...</div>';
+            
+            const selectedDate = document.getElementById('history-date-picker')?.value || '';
+            const url = selectedDate ? '/api/predictions?date=' + selectedDate : '/api/predictions';
+            
             try {
-                const r = await fetch('/api/archive');
+                const r = await fetch(url);
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 const data = await r.json();
-                const days = data.days || data.archive || [];
-                historyData = days;
-                let totalCorrect = 0, totalWrong = 0;
-                days.forEach(d => { totalCorrect += d.correct || 0; totalWrong += d.wrong || 0; });
-                document.getElementById('stat-correct').textContent = totalCorrect;
-                document.getElementById('stat-wrong').textContent = totalWrong;
-                const total = totalCorrect + totalWrong;
-                document.getElementById('stat-accuracy').textContent = total > 0 ? Math.round((totalCorrect / total) * 100) + '%' : '—';
                 
-                renderHistory();
+                const corrects = data.corrects || [];
+                const rates = data.rates || [];
+                const rejetes = data.rejetes || [];
+                const paris = data.paris_du_jour || [];
+                
+                // Stats
+                const totalCorrect = corrects.length;
+                const totalWrong = rates.length;
+                const totalParis = totalCorrect + totalWrong;
+                const accuracy = totalParis > 0 ? Math.round((totalCorrect / totalParis) * 100) : 0;
+                
+                let html = `
+                    <div class="grid grid-cols-3 gap-2 mb-4">
+                        <div class="card p-3 text-center">
+                            <div class="text-2xl font-bold text-green-400">${totalCorrect}</div>
+                            <div class="text-xs text-neutral-400 uppercase">Corrects</div>
+                        </div>
+                        <div class="card p-3 text-center">
+                            <div class="text-2xl font-bold text-red-400">${totalWrong}</div>
+                            <div class="text-xs text-neutral-400 uppercase">Ratés</div>
+                        </div>
+                        <div class="card p-3 text-center">
+                            <div class="text-2xl font-bold text-white">${accuracy}%</div>
+                            <div class="text-xs text-neutral-400 uppercase">Précision</div>
+                        </div>
+                    </div>
+                `;
+                
+                // Sélecteur de date
+                html += `<div class="mb-4">
+                    <div class="flex items-center gap-2 bg-card rounded-xl p-2 border border-white/10">
+                        <span class="text-neutral-400 text-sm">📅</span>
+                        <input type="date" id="history-date-picker" 
+                               value="${selectedDate || data.date || ''}"
+                               class="flex-1 bg-transparent text-white text-sm outline-none"
+                               onchange="loadHistory()">
+                    </div>
+                </div>`;
+                
+                // PARIS DU JOUR (ceux qui ont été pariés)
+                if (paris.length > 0) {
+                    html += `<div class="mb-4">
+                        <h3 class="text-sm font-bold text-blue-400 mb-2">🎯 Paris du jour (${paris.length})</h3>`;
+                    paris.forEach(m => {
+                        const badge = signalBadge(m.signal);
+                        const marketBadge = getMarketBadge(m.market);
+                        const cote = m.market === 'under' ? m.cote_under : m.cote_over;
+                        const verdict = m.result_verdict || '⏳';
+                        const verdictColor = verdict === '✓' ? 'text-green-400' : verdict === '×' ? 'text-red-400' : 'text-yellow-400';
+                        const verdictIcon = verdict === '✓' ? '✅' : verdict === '×' ? '❌' : '⏳';
+                        
+                        html += `<div class="card p-3 mb-2 cursor-pointer hover:bg-cardHover transition" onclick="openMatch('${m.match_id}')">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center gap-2">
+                                    ${badge}
+                                    ${marketBadge}
+                                    <span class="${verdictColor} font-bold">${verdictIcon}</span>
+                                </div>
+                                <span class="text-xs font-bold text-green-400">${m.mise.toFixed(2)}€</span>
+                            </div>
+                            <div class="text-sm font-medium text-white">${m.home || '?'} vs ${m.away || '?'}</div>
+                            <div class="flex justify-between text-xs mt-1">
+                                <span class="text-neutral-500">${cote ? cote.toFixed(2) : '—'}</span>
+                                <span class="text-neutral-400">Ligue ${m.league_id}</span>
+                            </div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                }
+                
+                // CORRECTS
+                if (corrects.length > 0) {
+                    html += `<div class="mb-4">
+                        <h3 class="text-sm font-bold text-green-400 mb-2">✅ Corrects (${corrects.length})</h3>`;
+                    corrects.forEach(m => {
+                        const marketBadge = getMarketBadge(m.market);
+                        const cote = m.market === 'under' ? m.cote_under : m.cote_over;
+                        html += `<div class="card p-2 mb-1 text-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-neutral-300">${m.home || '?'} vs ${m.away || '?'}</span>
+                                <span class="text-neutral-500">${marketBadge} ${cote ? cote.toFixed(2) : '—'}</span>
+                            </div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                }
+                
+                // RATÉS
+                if (rates.length > 0) {
+                    html += `<div class="mb-4">
+                        <h3 class="text-sm font-bold text-red-400 mb-2">❌ Ratés (${rates.length})</h3>`;
+                    rates.forEach(m => {
+                        const marketBadge = getMarketBadge(m.market);
+                        const cote = m.market === 'under' ? m.cote_under : m.cote_over;
+                        html += `<div class="card p-2 mb-1 text-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-neutral-300">${m.home || '?'} vs ${m.away || '?'}</span>
+                                <span class="text-neutral-500">${marketBadge} ${cote ? cote.toFixed(2) : '—'}</span>
+                            </div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                }
+                
+                // REJETÉS
+                if (rejetes.length > 0) {
+                    html += `<div class="mb-4">
+                        <h3 class="text-sm font-bold text-neutral-500 mb-2">⚠️ Rejetés (${rejetes.length})</h3>`;
+                    rejetes.forEach(m => {
+                        html += `<div class="card p-2 mb-1 text-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-neutral-400">${m.home || '?'} vs ${m.away || '?'}</span>
+                                <span class="text-neutral-600">Ligue ${m.league_id}</span>
+                            </div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                }
+                
+                el.innerHTML = html;
+                
             } catch (e) {
-                el.innerHTML = `<div class="card p-6 text-center"><div class="text-4xl mb-2">📡</div><div class="text-sm text-neutral-400 font-medium">Serveur non joignable</div></div>`;
+                el.innerHTML = '<div class="card p-6 text-center text-red-400 text-sm">Erreur : ' + e.message + '</div>';
             }
         }
+
 
         async function handleAnalyze(btn) {
             if (btn.classList.contains('loading')) return;
@@ -2051,19 +2158,6 @@ async function loadHomeForDate(date) {
                 setTimeout(loadHistory, 2000);
             } catch (e) { alert('Erreur: ' + e.message); }
         }
-
-        // Init date picker sur la dernière date enrichie
-        (async () => {
-            try {
-                const r = await fetch('/api/archive?limit=1');
-                const data = await r.json();
-                const days = data.days || [];
-                if (days.length > 0) {
-                    const dp = document.getElementById('date-picker');
-                    if (dp) dp.value = days[0].date;
-                }
-            } catch (e) {}
-        })();
 
         loadHome();
         filterByMarket('all');

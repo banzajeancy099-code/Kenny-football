@@ -73,31 +73,32 @@ def api_predictions():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    # Transforme pour le dashboard
-    out = []
+    # Enrichit avec match_data
+    enriched = []
     for m in matches:
         md = m.get("match_data") or {}
         if isinstance(md, str):
-            import json
+            import json as _json
             try:
-                md = json.loads(md)
+                md = _json.loads(md)
             except Exception:
                 md = {}
 
-        # Fallback : lit dans match_data si colonne NULL
         home = m.get("home_team_name") or md.get("home_team_name") or md.get("home")
         away = m.get("away_team_name") or md.get("away_team_name") or md.get("away")
         kickoff = m.get("kickoff") or md.get("kickoff") or md.get("event_date")
 
-        # Calcule la mise (10€ si signal strong, sinon 0)
         sig = m.get("signal_strength") or md.get("signal")
+        market = md.get("market")
+        edge = md.get("edge")
+
         mise_val = m.get("mise_kelly")
         if mise_val is None:
             mise_val = 10.0 if sig == "strong" else (5.0 if sig == "medium" else 0.0)
         else:
             mise_val = float(mise_val)
 
-        out.append({
+        enriched.append({
             "match_id": m.get("match_id"),
             "league_id": m.get("league_id"),
             "league_name": m.get("league_name") or md.get("league_name"),
@@ -112,22 +113,59 @@ def api_predictions():
             "proba_under": m.get("proba_under") or md.get("proba_under"),
             "cote_over": float(m.get("cote_over") or 0) or None,
             "cote_under": float(m.get("cote_under") or 0) or None,
-            "edge_over": m.get("edge_over") or md.get("edge"),
-            "edge_under": m.get("edge_under"),
+            "edge": edge,
             "signal": sig,
-            "market": md.get("market"),
+            "market": market,
             "mise": mise_val,
-            "mise_kelly": mise_val if md.get("market") == "over" else 0,
-            "mise_under": mise_val if md.get("market") == "under" else 0,
             "result_verdict": m.get("result_verdict"),
         })
 
-    return jsonify(out)
+    # ─────────────────────────────────────────
+    # SÉLECTION PARIS DU JOUR (top 10 par edge)
+    # ─────────────────────────────────────────
+    TOP_N = 10
+    EDGE_MIN = 0.08
 
+    eligible = [
+        m for m in enriched
+        if m["signal"] == "strong"
+        and m["edge"] is not None
+        and m["edge"] >= EDGE_MIN
+        and m["cote_over"] is not None
+        and 1.40 <= (m["cote_over"] or 0) <= 1.80
+    ]
 
-# ================================================================== #
-#  API — Historique
-# ================================================================== #
+    # Trie par edge décroissant
+    eligible.sort(key=lambda m: m["edge"] or 0, reverse=True)
+
+    # Top 10
+    paris_du_jour = eligible[:TOP_N]
+    pj_ids = {m["match_id"] for m in paris_du_jour}
+
+    # Confiance moyenne = les autres matchs (strong hors top, medium, etc.)
+    confiance_moyenne = [
+        m for m in enriched
+        if m["match_id"] not in pj_ids
+        and m["signal"] in ("strong", "medium")
+        and m["result_verdict"] is None
+    ]
+
+    # Historique = uniquement les matchs avec verdict (J-1 et avant)
+    corrects = [m for m in enriched if m["result_verdict"] == "✓"]
+    rates = [m for m in enriched if m["result_verdict"] == "×"]
+    rejetes = [m for m in enriched if m["signal"] == "rejected"]
+
+    return jsonify({
+        "date": date,
+        "paris_du_jour": paris_du_jour,
+        "confiance_moyenne": confiance_moyenne,
+        "corrects": corrects,
+        "rates": rates,
+        "rejetes": rejetes,
+        "n_paris_du_jour": len(paris_du_jour),
+        "n_eligible": len(eligible),
+    })
+
 @app.route("/api/archive")
 def api_archive():
     limit = request.args.get("limit", 30, type=int)
