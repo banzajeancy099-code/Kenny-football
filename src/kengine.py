@@ -146,7 +146,8 @@ def _weights_for(layer_results: dict) -> dict:
 # Décision marché
 # ─────────────────────────────────────────
 def _decide_market(layer_results: dict, match: dict = None) -> tuple[str, float, float, list]:
-    """Over prioritaire, Under fallback."""
+    """Over prioritaire, Under fallback. Proba via Poisson (EG)."""
+    import math
     warnings = []
     l2 = layer_results.get("l02")
     l47 = layer_results.get("l47")
@@ -155,9 +156,21 @@ def _decide_market(layer_results: dict, match: dict = None) -> tuple[str, float,
     if l2 is None and l47 is None:
         return "rejected", 0.0, 0.0, ["Aucune couche"]
 
+    # Calcule EG et P(Over) via Poisson
+    eg = None
+    if l2 and hasattr(l2, "meta") and isinstance(l2.meta, dict):
+        eg = l2.meta.get("expected_goals")
+    
+    p_over = 0.5
+    p_under = 0.5
+    if eg and eg > 0:
+        p0 = math.exp(-eg)
+        p_over = 1 - p0 * (1 + eg + eg**2 / 2)
+        p_under = 1 - p_over
+
     # Over prioritaire
     if l2 is not None and not l2.rejected and l2.score >= SEUIL:
-        return "over", min(l2.score / 10.0, 0.95), l2.score, [f"Over (score={l2.score:.2f})"]
+        return "over", min(p_over, 0.95), l2.score, [f"Over (EG={eg:.2f}, P={p_over:.1%})"]
 
     if l2 is not None and l2.rejected:
         warnings.append(f"L2 rejetée : {l2.warnings[:2]}")
@@ -168,7 +181,7 @@ def _decide_market(layer_results: dict, match: dict = None) -> tuple[str, float,
     if l47.rejected:
         return "rejected", 0.0, 0.0, warnings + [f"L47 rejetée : {l47.warnings[:2]}"]
     if l47.score >= SEUIL:
-        return "under", min(l47.score / 10.0, 0.95), l47.score, warnings + [f"Under (score={l47.score:.2f})"]
+        return "under", min(p_under, 0.95), l47.score, warnings + [f"Under (EG={eg:.2f}, P={p_under:.1%})"]
 
     return "rejected", 0.0, 0.0, warnings + ["Aucun marché valide"]
 
@@ -178,11 +191,10 @@ def _decide_market(layer_results: dict, match: dict = None) -> tuple[str, float,
 # ─────────────────────────────────────────
 def _signal_from(score: float, edge: float | None, cote: float | None, proba: float | None = None) -> str:
     """
-    Seuils calibrés (ancien moteur) :
-    - strong : score >= 5.5 + edge >= 0.15
-    - medium : score >= 4.5 + edge >= 0.10
-    - weak   : score >= 4.0 + edge >= 0.08
-    - bonus favori : proba >= 0.70 + score >= 4.5 + edge >= 0.00
+    Seuils calibrés pour Poisson (proba réelle, pas score/10) :
+    - strong : score >= 6.0 + edge >= 0.05
+    - medium : score >= 5.0 + edge >= 0.03
+    - weak   : score >= 4.0 + edge >= 0.02
     """
     if proba is None:
         proba = score / 10.0
@@ -194,14 +206,12 @@ def _signal_from(score: float, edge: float | None, cote: float | None, proba: fl
             return "weak_nocote"
         return "rejected"
 
-    if score >= 5.5 and edge is not None and edge >= 0.15:
+    if score >= 6.0 and edge is not None and edge >= 0.05:
         return "strong"
-    if score >= 4.5 and edge is not None and edge >= 0.10:
+    if score >= 5.0 and edge is not None and edge >= 0.03:
         return "medium"
-    if score >= 4.0 and edge is not None and edge >= 0.08:
+    if score >= 4.0 and edge is not None and edge >= 0.02:
         return "weak"
-    if score >= 4.5 and proba >= 0.70 and edge is not None and edge >= 0.00:
-        return "medium"
     return "rejected"
 
 

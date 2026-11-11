@@ -124,7 +124,7 @@ def api_predictions():
     # SÉLECTION PARIS DU JOUR (top 10 par edge)
     # ─────────────────────────────────────────
     TOP_N = 10
-    EDGE_MIN = 0.08
+    EDGE_MIN = 0.05
 
     # Filtre sur le marché réel (over ou under)
     def _cote_for_market(m):
@@ -137,7 +137,7 @@ def api_predictions():
         and m["edge"] is not None
         and m["edge"] >= EDGE_MIN
         and _cote_for_market(m) is not None
-        and 1.40 <= (_cote_for_market(m) or 0) <= 2.30
+        and 1.40 <= (_cote_for_market(m) or 0) <= 2.50
     ]
 
     # Trie par edge décroissant

@@ -125,8 +125,8 @@ def analyse_du_jour(date_str: str = None):
             continue
 
         # Filtre 2 : edge >= 10%
-        if edge is None or edge < 0.10:
-            print(f"  ⛔ {match['home_team_name']} vs {match['away_team_name']} : edge={edge} < 10% (EG={eg:.2f})", flush=True)
+        if edge is None or edge < 0.05:  # seuil value bet : 5%
+            print(f"  ⛔ {match['home_team_name']} vs {match['away_team_name']} : edge={edge} < 5% (EG={eg:.2f})", flush=True)
             continue
 
         # Filtre 3 : cote dans [1.40, 2.30]
@@ -134,7 +134,7 @@ def analyse_du_jour(date_str: str = None):
             print(f"  ⛔ {match['home_team_name']} vs {match['away_team_name']} : cote={cote} hors [1.40, 2.30]", flush=True)
             continue
 
-        print(f"  ✅ {match['home_team_name']} vs {match['away_team_name']} : edge={edge:.1%} >= 10% (EG={eg:.2f}, {market} @ {cote:.2f})", flush=True)
+        print(f"  ✅ {match['home_team_name']} vs {match['away_team_name']} : edge={edge:.1%} >= 5% (EG={eg:.2f}, {market} @ {cote:.2f})", flush=True)
 
         matches_to_save.append({
             "match_id": res["match_id"],
