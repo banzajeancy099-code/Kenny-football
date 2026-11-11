@@ -21,8 +21,13 @@ from api.kodds import KOdds
 
 
 # Ligues typées (identiques à kengine.py)
-LEAGUES_OVER = {18, 17, 14, 54, 25, 19, 10, 108, 7, 8}
-LEAGUES_UNDER = {34, 85, 89, 23, 53, 32, 94, 84}
+# ─────────────────────────────────────────
+# Ligues : importées depuis kengine (source unique de vérité)
+# ─────────────────────────────────────────
+from kengine import LEAGUES_OVER, LEAGUES_UNDER                          # 2 ligues (34 neutre, 85 +17.6%)
+
+# Nouvelles ligues rentables ajoutées aux OVER
+LEAGUES_OVER |= {4, 9, 80, 96}
 
 
 def analyse_du_jour(date_str: str = None):
@@ -97,12 +102,39 @@ def analyse_du_jour(date_str: str = None):
         except Exception as e:
             print(f"  {match['home_team_name']} vs {match['away_team_name']} KO: {e}", flush=True)
             continue
+        
+        # AUDIT v2 : extraire expected_goals du result pour filtrer APRÈS
+        l2_meta = res.get("l2_meta", {}) if isinstance(res, dict) else {}
+        if isinstance(res, dict) and "match_data" in res:
+            l2_meta = res["match_data"].get("l2_meta", {}) if isinstance(res["match_data"], dict) else {}
 
-        # Filtre final
-        if res["signal"] != "strong":
+        # === FILTRE VALUE BET STRICT (edge >= 10%) ===
+        eg = 0
+        if isinstance(res, dict):
+            layer_results = res.get("layer_results", {})
+            l02 = layer_results.get("l02") if isinstance(layer_results, dict) else None
+            if l02 and hasattr(l02, "meta") and isinstance(l02.meta, dict):
+                eg = l02.meta.get("expected_goals", 0) or 0
+
+        edge = res.get("edge")
+        cote = res.get("cote")
+        market = res.get("market")
+
+        # Filtre 1 : signal doit être strong ou medium
+        if res.get("signal") not in ("strong", "medium"):
             continue
-        if res["cote"] is None or not (1.40 <= res["cote"] <= 1.80):
+
+        # Filtre 2 : edge >= 10%
+        if edge is None or edge < 0.10:
+            print(f"  ⛔ {match['home_team_name']} vs {match['away_team_name']} : edge={edge} < 10% (EG={eg:.2f})", flush=True)
             continue
+
+        # Filtre 3 : cote dans [1.40, 2.30]
+        if cote is None or not (1.40 <= cote <= 2.30):
+            print(f"  ⛔ {match['home_team_name']} vs {match['away_team_name']} : cote={cote} hors [1.40, 2.30]", flush=True)
+            continue
+
+        print(f"  ✅ {match['home_team_name']} vs {match['away_team_name']} : edge={edge:.1%} >= 10% (EG={eg:.2f}, {market} @ {cote:.2f})", flush=True)
 
         matches_to_save.append({
             "match_id": res["match_id"],

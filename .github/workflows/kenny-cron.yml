@@ -2,34 +2,49 @@ name: Kenny Football Cron
 
 on:
   schedule:
-    # 23h55 UTC — Analyse des matchs du jour
-    - cron: '55 23 * * *'
-    # 04h00 UTC — Vérification des résultats J-1
-    - cron: '0 4 * * *'
+    - cron: '55 23 * * *'   # analyse du jour
+    - cron: '0 4 * * *'     # vérification résultats
   workflow_dispatch:
 
 jobs:
   analyse:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: github.event.schedule == '55 23 * * *' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: Réveil Render + Analyse
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Analyse du jour
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BZZOIRO_API_KEY: ${{ secrets.BZZOIRO_API_KEY }}
+          BZZOIRO_API_KEY_5: ${{ secrets.BZZOIRO_API_KEY_5 }}
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          PYTHONPATH: src
         run: |
-          echo "=== Réveil Render ==="
-          curl -s --max-time 60 https://kenny-football.onrender.com/api/health
-          echo ""
-          echo "=== Analyse ==="
-          curl -s -X POST --max-time 120 https://kenny-football.onrender.com/api/analyze/start
+          python -m jobs.kjob_analyse $(date +%Y-%m-%d)
 
   verification:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event.schedule == '0 4 * * *'
     steps:
-      - name: Réveil Render + Vérification
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Vérification résultats J-1
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BZZOIRO_API_KEY: ${{ secrets.BZZOIRO_API_KEY }}
+          BZZOIRO_API_KEY_5: ${{ secrets.BZZOIRO_API_KEY_5 }}
+          PYTHONPATH: src
         run: |
-          echo "=== Réveil Render ==="
-          curl -s --max-time 60 https://kenny-football.onrender.com/api/health
-          echo ""
-          DATE=$(date -u -d 'yesterday' +%Y-%m-%d)
-          echo "=== Vérification $DATE ==="
-          curl -s --max-time 120 https://kenny-football.onrender.com/api/resultats/$DATE
+          python -m jobs.kjob_verif $(date -u -d 'yesterday' +%Y-%m-%d)

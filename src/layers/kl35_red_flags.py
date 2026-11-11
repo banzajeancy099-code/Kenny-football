@@ -28,19 +28,21 @@ class KL35RedFlags(Layer):
         penalties = 0.0
         meta = {}
 
-        # Red flag 1 : cote over anormale
+        # Red flag 1 : cote over anormale → VETO
         cote_over = match.get("cote_over")
         if cote_over is not None and (cote_over < 1.15 or cote_over > 2.50):
-            penalties += 2.0
-            warnings.append(f"L35: cote over anormale ({cote_over:.2f})")
-            meta["cote_anormal"] = True
+            res.rejected = True
+            res.warnings = [f"L35: cote over anormale ({cote_over:.2f}) → match truqué"]
+            res.meta = {"cote_anormal": True}
+            return res
 
-        # Red flag 2 : cote under anormale
+        # Red flag 2 : cote under anormale → VETO
         cote_under = match.get("cote_under")
         if cote_under is not None and (cote_under < 1.15 or cote_under > 3.50):
-            penalties += 2.0
-            warnings.append(f"L35: cote under anormale ({cote_under:.2f})")
-            meta["cote_under_anormal"] = True
+            res.rejected = True
+            res.warnings = [f"L35: cote under anormale ({cote_under:.2f}) → match truqué"]
+            res.meta = {"cote_under_anormal": True}
+            return res
 
         # Red flag 3 : météo extrême
         weather = match.get("weather") or {}
@@ -84,6 +86,20 @@ class KL35RedFlags(Layer):
             warnings.append(f"L35: {zero_zero} matchs 0-0 récents")
             meta["zero_zero"] = True
 
+        # Détection fraude via historique de côtes
+        try:
+            from scripts.detect_fraud_odds import detect_fraud
+            match_id = match.get("match_id")
+            if match_id:
+                is_fraud, fraud_reasons = detect_fraud(match_id)
+                if is_fraud:
+                    res.rejected = True
+                    res.warnings = fraud_reasons
+                    res.meta = {"fraud_detected": True, "reasons": fraud_reasons}
+                    return res
+        except Exception as e:
+            print(f"[L35] detect_fraud KO : {e}")
+        
         score = max(0.0, 10.0 - penalties)
 
         if score < 3.0:

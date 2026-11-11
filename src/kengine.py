@@ -27,46 +27,74 @@ from layers.kl49_signal_strength import KL49SignalStrength
 
 
 # ─────────────────────────────────────────
-# Chargement des ligues actives
 # ─────────────────────────────────────────
-_LEAGUES_PATH = Path(__file__).parent.parent / "config" / "leagues.json"
-ACTIVE_LEAGUES = set()
-try:
-    with open(_LEAGUES_PATH) as _f:
-        _cfg = json.load(_f)
-    for _tier_name, _tier in _cfg.items():
-        if isinstance(_tier, dict) and "leagues" in _tier:
-            for _l in _tier["leagues"]:
-                _lid = _l.get("id")
-                if _lid is not None:
-                    ACTIVE_LEAGUES.add(_lid)
-    print(f"[kengine] {len(ACTIVE_LEAGUES)} ligues chargées")
-except Exception as _e:
-    print(f"[kengine] Impossible de charger leagues.json : {_e}")
-
-# Ligues typées (backtest: ROI +30,06% sur 249 paris)
+# Ligues typées (AUDIT v3 : 28 ligues optimisées)
+# Source unique de vérité : plus de dépendance à leagues.json
+# ─────────────────────────────────────────
 LEAGUES_OVER = {
-    18,   # MLS
-    17,   # Süper Lig
-    14,   # Pro League BE
-    54,   # Eliteserien
-    25,   # Ekstraklasa
-    19,   # Liga MX
-    10,   # Eredivisie
+    # Tier 1 (N >= 50, Strong >= 25) : très fiables
+    4, 7, 8, 14, 17, 18, 19, 25, 38, 54, 80, 83,
+    # Tier 2 (N 20-50, Over >= 60%) : bonnes
+    5, 10, 11, 13, 36, 43, 52, 56, 70, 96,
+    # Nouvelles (championnats nationaux uniquement, pas de coupe)
+    1,    # Premier League
+    2,    # Liga Portugal
+    3,    # La Liga
+    6,    # Ligue 1
+    12,   # Championship
+    15,   # Super League (Suisse)
+    22,   # Parva Liga (Bulgarie)
+    24,   # Super League GR
+    26,   # Allsvenskan (Suède)
+    28,   # Nigeria Premier
+    49,   # J1 League (Japon)
+    50,   # K League 1 (Corée)
+    55,   # Veikkausliiga (Finlande)
+    57,   # USL Championship
+    82,   # Liga 3 (Portugal)
+    86,   # League One
+    87,   # League Two
+    89,   # Ligue 2 (France)
+    91,   # National League
+    95,   # Campeonato de Portugal
+    97,   # Challenger Pro League
+    98,   # Girabola (Angola)
+    99,   # Czech First League
+    100,  # Serie B (Italie)
+    101,  # Serie C Girone A
+    102,  # Serie C Girone C
+    103,  # Serie C Girone B
+    104,  # A-League Men
+    105,  # Ligue 3 (France)
+    106,  # Superettan (Suède)
+    107,  # Trendyol 1. Lig (Turquie D2)
     108,  # Eerste Divisie
-    7,    # Champions League
-    8,    # Europa League
+    109,  # Niké liga (Slovaquie)
+    # Nouvelles (coupes/international)
+    57,   # USL Championship
+    104,  # A-League Men
 }
+
 LEAGUES_UNDER = {
-    34,   # Brasileirão B
-    85,   # Argentine Primera
-    89,   # Ligue 2
-    23,   # Superliga ROU
-    53,   # Botola Pro
-    32,   # Copa Libertadores
-    94,   # 2. Bundesliga
+    34,   # Brasileirão Série B
+    35,   # Copa do Brasil
+    53,   # Botola Pro (Maroc)
     84,   # Superliga DK
+    85,   # Argentine Primera
+    94,   # 2. Bundesliga
+    # Nouvelles Under
+    92,   # Taça de Portugal
+    58,   # World Cup Qualif UEFA
+    64,   # UEFA Nations League
+    72,   # NWSL (F)
+    98,   # Girabola (Angola)
+    28,   # Nigeria Premier
+    105,  # Ligue 3 (France)
 }
+
+# Ligues actives = Over + Under (utilisée par run_match)
+ACTIVE_LEAGUES = LEAGUES_OVER | LEAGUES_UNDER
+print(f"[kengine] {len(ACTIVE_LEAGUES)} ligues actives (Over={len(LEAGUES_OVER)}, Under={len(LEAGUES_UNDER)})")
 
 
 WEIGHTS = {
@@ -218,21 +246,19 @@ def run_match(match: dict, ctx: dict, bankroll: float = 1000.0) -> dict:
     # 4. Décision marché
     market, proba, score, warnings = _decide_market(results, match)
 
-    # 5. Filtre ligues typées
-    if league_id in LEAGUES_OVER and market != "over":
-        return _rejected_dict(match, f"Ligue {league_id} = Over mais marché={market}", results)
-    if league_id in LEAGUES_UNDER and market != "under":
-        return _rejected_dict(match, f"Ligue {league_id} = Under mais marché={market}", results)
-
+    # 5. Plus de forçage "ligue typée → marché forcé"
+    # Le marché est choisi par _decide_market (Over prioritaire, Under fallback)
+    # Si la ligue est Over mais que _decide_market dit Under, c'est OK
     if market == "rejected":
-        return _rejected_dict(match, "Aucun marché valide", results)
+        return _rejected_dict(match, "Over ET Under rejetés", results)
 
     # 6. Cote correspondante
     cote = match.get("cote_under") if market == "under" else match.get("cote_over")
 
     # 7. Filtre cote [1.40, 1.80]
-    if cote is None or cote < 1.40 or cote > 1.80:
-        return _rejected_dict(match, f"Cote {cote} hors [1.40, 1.80]", results)
+    # AUDIT v2 : cote élargie [1.40, 2.20] (ROI +11% à +35% sur les cotes 1.80-2.20 avec EG >= 3.5)
+    if cote is None or cote < 1.40 or cote > 2.20:
+        return _rejected_dict(match, f"Cote {cote} hors [1.40, 2.20]", results)
 
     # 8. Signal + mise
     edge = kkelly.kelly_edge(proba, cote)

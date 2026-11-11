@@ -96,12 +96,24 @@ class KOdds:
             return None
 
         try:
-            raw = self.bzzoiro.get_event_odds(int(event_id))
+            # get_event_odds() retourne DÉJÀ le format final {cote_over, cote_under, ...}
+            # On ne doit PAS re-parser (ancien bug : double parsing)
+            result = self.bzzoiro.get_event_odds(int(event_id))
         except Exception as e:
             print(f"[kodds] bzzoiro odds KO : {e}")
             return None
 
-        return self._parse_bzzoiro_odds(raw)
+        if not result or not isinstance(result, dict):
+            return None
+        if result.get("cote_over") is None:
+            return None
+
+        return {
+            "cote_over": float(result["cote_over"]),
+            "cote_under": float(result["cote_under"]) if result.get("cote_under") else None,
+            "source": "bzzoiro",
+            "last_update_at": result.get("updated_at"),
+        }
 
     def _parse_bzzoiro_odds(self, raw) -> dict | None:
         """

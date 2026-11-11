@@ -16,7 +16,7 @@ Formule (normalisée 0-10) :
 
 Rejets stricts :
   - Couche 1 incomplète (pas de stats de base)
-  - Cote Under hors [1.40, 2.10]
+  - Cote Under hors [1.40, 2.50]
 
 Seuil de validation (dans l'orchestrateur) : score_under >= 6.5
 """
@@ -90,11 +90,12 @@ class KL47UnderScore(Layer):
             res.confidence = 0.0
             res.warnings = warnings + ["L47: cote under absente"]
             return res
-        if cote_under < 1.40 or cote_under > 2.10:
+        # AUDIT v2 : élargi à [1.40, 2.30] (aligné sur kengine [1.40, 2.20])
+        if cote_under < 1.40 or cote_under > 2.50:
             res.rejected = True
             res.confidence = 0.0
             res.warnings = warnings + [
-                f"L47: cote under hors plage [{cote_under:.2f} hors 1.40-2.10]"
+                f"L47: cote under hors plage [{cote_under:.2f} hors 1.40-2.50]"
             ]
             return res
 

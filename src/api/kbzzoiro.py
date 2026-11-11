@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -42,8 +43,10 @@ class KBzzoiro:
         self.api_key = api_key or os.environ.get("BZZOIRO_API_KEY")
         if not self.api_key:
             raise RuntimeError("BZZOIRO_API_KEY manquante")
+        self.api_key_backup = os.environ.get("BZZOIRO_API_KEY_5")
         self._last_call_ts = 0.0
         self._cache = {}
+        self._odds_cache = {}
         self._conn = conn
         self._team_matches_cache = {}
         self._team_splits_cache = {}
@@ -81,15 +84,55 @@ class KBzzoiro:
                 return data
 
         self._rate_limit()
-        req = urllib.request.Request(url, headers=self._headers())
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        try:
+            req = urllib.request.Request(url, headers=self._headers())
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and self.api_key_backup:
+                print(f"⚠️ Clé 1 épuisée, bascule clé 5 sur {path}")
+                headers = {
+                    "Authorization": f"Token {self.api_key_backup}",
+                    "Content-Type": "application/json",
+                }
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+            else:
+                raise
         self._cache[url] = (now, data)
         return data
 
     def get_matches_today(self, date: str) -> list:
-        data = self._get("/events/", {"date_from": date, "date_to": date})
-        return data.get("results", [])
+        """Récupère TOUS les matchs du jour via pagination (toutes ligues)."""
+        all_matches = []
+        page = 1
+        max_pages = 20  # Sécurité anti-boucle infinie
+
+        while page <= max_pages:
+            try:
+                data = self._get("/events/", {
+                    "date_from": date,
+                    "date_to": date,
+                    "limit": 200,
+                    "page": page,
+                })
+                results = data.get("results", [])
+                if not results:
+                    break
+                all_matches.extend(results)
+
+                if not data.get("next"):
+                    break
+
+                page += 1
+                time.sleep(0.05)
+
+            except Exception as e:
+                print(f"Pagination KO page {page}: {e}")
+                break
+
+        return all_matches
 
     def get_matches_range(self, date_from: str, date_to: str) -> list:
         data = self._get("/events/", {"date_from": date_from, "date_to": date_to})
@@ -256,6 +299,36 @@ class KBzzoiro:
                 "total_goals": (m.get("home_score") or 0) + (m.get("away_score") or 0),
             })
         return out
+
+
+    def get_event_odds(self, event_id: int) -> dict | None:
+        """Récupère les cotes Over/Under 2.5 depuis /events/{id}/odds/ (cache 1h)."""
+        now = time.time()
+        cached = self._odds_cache.get(event_id)
+        if cached and (now - cached[0]) < 3600:
+            return cached[1]
+
+        try:
+            data = self._get(f"/events/{event_id}/odds/")
+        except Exception as e:
+            print(f"get_event_odds KO event {event_id}: {e}")
+            return None
+
+        raw = data.get("odds") if isinstance(data.get("odds"), dict) else data
+        cote_over = raw.get("over_25_goals") or raw.get("over_2_5")
+        cote_under = raw.get("under_25_goals") or raw.get("under_2_5")
+
+        if not cote_over:
+            return None
+
+        result = {
+            "cote_over": float(cote_over),
+            "cote_under": float(cote_under) if cote_under else None,
+            "source": "bzzoiro",
+            "updated_at": data.get("last_update_at"),
+        }
+        self._odds_cache[event_id] = (now, result)
+        return result
 
 
 def knew_client(api_key: str | None = None) -> KBzzoiro:

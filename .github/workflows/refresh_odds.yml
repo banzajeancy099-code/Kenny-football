@@ -1,0 +1,27 @@
+name: Refresh odds
+
+on:
+  schedule:
+    # Toutes les 2h, de 00h à 04h (heure de la décision)
+    # 00h, 02h, 04h, 06h, 08h, 10h, 12h, 14h, 16h, 18h, 20h, 22h
+    - cron: '0 0,2,4,6,8,10,12,14,16,18,20,22 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Refresh odds
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BZZOIRO_API_KEY: ${{ secrets.BZZOIRO_API_KEY }}
+          BZZOIRO_API_KEY_5: ${{ secrets.BZZOIRO_API_KEY_5 }}
+          PYTHONPATH: src
+        run: python3 scripts/refresh_odds.py
