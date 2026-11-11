@@ -126,13 +126,18 @@ def api_predictions():
     TOP_N = 10
     EDGE_MIN = 0.08
 
+    # Filtre sur le marché réel (over ou under)
+    def _cote_for_market(m):
+        market = m.get("market") or "over"
+        return m.get("cote_under") if market == "under" else m.get("cote_over")
+    
     eligible = [
         m for m in enriched
         if m["signal"] == "strong"
         and m["edge"] is not None
         and m["edge"] >= EDGE_MIN
-        and m["cote_over"] is not None
-        and 1.40 <= (m["cote_over"] or 0) <= 1.80
+        and _cote_for_market(m) is not None
+        and 1.40 <= (_cote_for_market(m) or 0) <= 2.30
     ]
 
     # Trie par edge décroissant
