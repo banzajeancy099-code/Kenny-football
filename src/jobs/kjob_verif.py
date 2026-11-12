@@ -66,8 +66,23 @@ def verifier_resultats(date_str: str = None):
         total_goals = home_score + away_score
         real_over = total_goals > 2.5
 
-        # Détermine le marché prédit
-        market = (p.get("match_data") or {}).get("market")
+        # Détermine le marché prédit (fallback sur edges si market absent)
+        md = p.get("match_data") or {}
+        if isinstance(md, str):
+            import json
+            try:
+                md = json.loads(md)
+            except:
+                md = {}
+        market = md.get("market")
+        
+        # Fallback : deviner via edge_over/edge_under
+        if market is None:
+            if p.get("edge_over") is not None:
+                market = "over"
+            elif p.get("edge_under") is not None:
+                market = "under"
+        
         if market == "over":
             verdict = "✓" if real_over else "×"
         elif market == "under":

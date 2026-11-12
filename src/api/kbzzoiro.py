@@ -40,10 +40,11 @@ CACHE_TTL_S = 300
 
 class KBzzoiro:
     def __init__(self, api_key: str | None = None, conn=None):
-        self.api_key = api_key or os.environ.get("BZZOIRO_API_KEY")
+        # Clé 5 prioritaire (clé 1 épuisée), clé 1 en backup
+        self.api_key = os.environ.get("BZZOIRO_API_KEY_5")
         if not self.api_key:
-            raise RuntimeError("BZZOIRO_API_KEY manquante")
-        self.api_key_backup = os.environ.get("BZZOIRO_API_KEY_5")
+            self.api_key = os.environ.get("BZZOIRO_API_KEY")
+        self.api_key_backup = os.environ.get("BZZOIRO_API_KEY")
         self._last_call_ts = 0.0
         self._cache = {}
         self._odds_cache = {}
@@ -51,11 +52,6 @@ class KBzzoiro:
         self._team_matches_cache = {}
         self._team_splits_cache = {}
         self._standings_cache = {}
-        self._team_matches_cache = {}
-        self._team_splits_cache = {}
-        # Cache équipes (évite les requêtes redondantes)
-        self._team_matches_cache = {}
-        self._team_splits_cache = {}  # Connexion persistante optionnelle
 
     # ------------------------------------------------------------------ #
     #  Couche 1 — API brute
@@ -144,8 +140,6 @@ class KBzzoiro:
     def get_event_stats(self, event_id: int) -> dict:
         return self._get(f"/events/{event_id}/stats/")
 
-    def get_event_odds(self, event_id: int) -> dict:
-        return self._get(f"/events/{event_id}/odds/")
 
     def get_event_lineups(self, event_id: int) -> dict:
         return self._get(f"/events/{event_id}/lineups/")
@@ -273,8 +267,6 @@ class KBzzoiro:
             "form_gf_ext": form_gf_ext,
             "xgf": None,
         }
-        self._team_splits_cache[team_id] = result
-        return result
         self._team_splits_cache[team_id] = result
         return result
 

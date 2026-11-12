@@ -26,9 +26,6 @@ from api.kodds import KOdds
 # ─────────────────────────────────────────
 from kengine import LEAGUES_OVER, LEAGUES_UNDER                          # 2 ligues (34 neutre, 85 +17.6%)
 
-# Nouvelles ligues rentables ajoutées aux OVER
-LEAGUES_OVER |= {4, 9, 80, 96}
-
 
 def analyse_du_jour(date_str: str = None):
     """Analyse les matchs du jour et stocke les paris retenus."""
@@ -103,12 +100,7 @@ def analyse_du_jour(date_str: str = None):
             print(f"  {match['home_team_name']} vs {match['away_team_name']} KO: {e}", flush=True)
             continue
         
-        # AUDIT v2 : extraire expected_goals du result pour filtrer APRÈS
-        l2_meta = res.get("l2_meta", {}) if isinstance(res, dict) else {}
-        if isinstance(res, dict) and "match_data" in res:
-            l2_meta = res["match_data"].get("l2_meta", {}) if isinstance(res["match_data"], dict) else {}
-
-        # === FILTRE VALUE BET STRICT (edge >= 10%) ===
+        # === FILTRE VALUE BET STRICT (edge >= 3%) ===
         eg = 0
         if isinstance(res, dict):
             layer_results = res.get("layer_results", {})
@@ -125,8 +117,8 @@ def analyse_du_jour(date_str: str = None):
             continue
 
         # Filtre 2 : edge >= 10%
-        if edge is None or edge < 0.05:  # seuil value bet : 5%
-            print(f"  ⛔ {match['home_team_name']} vs {match['away_team_name']} : edge={edge} < 5% (EG={eg:.2f})", flush=True)
+        if edge is None or edge < 0.03:  # seuil value bet : 3%
+            print(f"  ⛔ {match['home_team_name']} vs {match['away_team_name']} : edge={edge} < 3% (EG={eg:.2f})", flush=True)
             continue
 
         # Filtre 3 : cote dans [1.40, 2.30]
@@ -134,7 +126,7 @@ def analyse_du_jour(date_str: str = None):
             print(f"  ⛔ {match['home_team_name']} vs {match['away_team_name']} : cote={cote} hors [1.40, 2.30]", flush=True)
             continue
 
-        print(f"  ✅ {match['home_team_name']} vs {match['away_team_name']} : edge={edge:.1%} >= 5% (EG={eg:.2f}, {market} @ {cote:.2f})", flush=True)
+        print(f"  ✅ {match['home_team_name']} vs {match['away_team_name']} : edge={edge:.1%} >= 3% (EG={eg:.2f}, {market} @ {cote:.2f})", flush=True)
 
         matches_to_save.append({
             "match_id": res["match_id"],

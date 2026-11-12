@@ -20,9 +20,8 @@ import math
 import kdb
 
 
-# Ligues typées (identiques à kengine.py)
-LEAGUES_OVER = {18, 17, 14, 54, 25, 19}
-LEAGUES_UNDER = {34, 85, 89, 23, 53, 32}
+# Ligues importées depuis kengine (source unique de vérité)
+from kengine import LEAGUES_OVER, LEAGUES_UNDER
 
 
 def _load_matches():

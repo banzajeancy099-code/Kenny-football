@@ -115,52 +115,7 @@ class KOdds:
             "last_update_at": result.get("updated_at"),
         }
 
-    def _parse_bzzoiro_odds(self, raw) -> dict | None:
-        """
-        Parse la réponse Bzzoiro /events/{id}/odds/.
-        Format réel confirmé (event 10216) :
-          {
-            "event_id": 10216,
-            "odds": {
-              "home_win": 1.57, "draw": 3.79, "away_win": 5.23,
-              "over_15_goals": 1.27, "over_25_goals": 1.89, "over_35_goals": 3.19,
-              "under_15_goals": 3.45, "under_25_goals": 1.88, "under_35_goals": 1.31,
-              "btts_yes": 1.87, "btts_no": 1.82
-            },
-            "last_update_at": "...",
-            ...
-          }
-        On récupère over_25_goals et under_25_goals.
-        """
-        if not raw or not isinstance(raw, dict):
-            return None
 
-        odds = raw.get("odds") or {}
-        c_over = odds.get("over_25_goals")
-        c_under = odds.get("under_25_goals")
-
-        if c_over is None or c_under is None:
-            return None
-
-        # Extrait aussi les cotes 1X2 si disponibles
-        cote_home = odds.get("home_win")
-        cote_draw = odds.get("draw")
-        cote_away = odds.get("away_win")
-
-        return {
-            "cote_over": float(c_over),
-            "cote_under": float(c_under),
-            "cote_home": float(cote_home) if cote_home else None,
-            "cote_draw": float(cote_draw) if cote_draw else None,
-            "cote_away": float(cote_away) if cote_away else None,
-            "source": "bzzoiro",
-            "last_update_at": raw.get("last_update_at"),
-            "all_markets": odds,
-        }
-
-    # ------------------------------------------------------------------ #
-    #  Source 2 — The Odds API
-    # ------------------------------------------------------------------ #
     def _try_the_odds_api(self, match: dict) -> dict | None:
         if not self.odds_api_key:
             return None

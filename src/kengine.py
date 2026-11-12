@@ -32,64 +32,18 @@ from layers.kl49_signal_strength import KL49SignalStrength
 # Source unique de vérité : plus de dépendance à leagues.json
 # ─────────────────────────────────────────
 LEAGUES_OVER = {
-    # Tier 1 (N >= 50, Strong >= 25) : très fiables
+    # Tier 1 (N >= 50, Strong >= 25)
     4, 7, 8, 14, 17, 18, 19, 25, 38, 54, 80, 83,
-    # Tier 2 (N 20-50, Over >= 60%) : bonnes
+    # Tier 2 (N 20-50, Over >= 60%)
     5, 10, 11, 13, 36, 43, 52, 56, 70, 96,
-    # Nouvelles (championnats nationaux uniquement, pas de coupe)
-    1,    # Premier League
-    2,    # Liga Portugal
-    3,    # La Liga
-    6,    # Ligue 1
-    12,   # Championship
-    15,   # Super League (Suisse)
-    22,   # Parva Liga (Bulgarie)
-    24,   # Super League GR
-    26,   # Allsvenskan (Suède)
-    28,   # Nigeria Premier
-    49,   # J1 League (Japon)
-    50,   # K League 1 (Corée)
-    55,   # Veikkausliiga (Finlande)
-    57,   # USL Championship
-    82,   # Liga 3 (Portugal)
-    86,   # League One
-    87,   # League Two
-    89,   # Ligue 2 (France)
-    91,   # National League
-    95,   # Campeonato de Portugal
-    97,   # Challenger Pro League
-    98,   # Girabola (Angola)
-    99,   # Czech First League
-    100,  # Serie B (Italie)
-    101,  # Serie C Girone A
-    102,  # Serie C Girone C
-    103,  # Serie C Girone B
-    104,  # A-League Men
-    105,  # Ligue 3 (France)
-    106,  # Superettan (Suède)
-    107,  # Trendyol 1. Lig (Turquie D2)
-    108,  # Eerste Divisie
-    109,  # Niké liga (Slovaquie)
-    # Nouvelles (coupes/international)
-    57,   # USL Championship
-    104,  # A-League Men
+    # Championnats nationaux
+    1, 2, 3, 6, 12, 15, 22, 24, 26, 28, 49, 50, 55,
+    57, 82, 86, 87, 89, 91, 95, 97, 98, 99, 100, 101,
+    102, 103, 104, 105, 106, 107, 108, 109,
 }
 
 LEAGUES_UNDER = {
-    34,   # Brasileirão Série B
-    35,   # Copa do Brasil
-    53,   # Botola Pro (Maroc)
-    84,   # Superliga DK
-    85,   # Argentine Primera
-    94,   # 2. Bundesliga
-    # Nouvelles Under
-    92,   # Taça de Portugal
-    58,   # World Cup Qualif UEFA
-    64,   # UEFA Nations League
-    72,   # NWSL (F)
-    98,   # Girabola (Angola)
-    28,   # Nigeria Premier
-    105,  # Ligue 3 (France)
+    34, 35, 53, 84, 85, 94, 92, 58, 64, 72,
 }
 
 # Ligues actives = Over + Under (utilisée par run_match)
@@ -151,10 +105,16 @@ def _decide_market(layer_results: dict, match: dict = None) -> tuple[str, float,
     warnings = []
     l2 = layer_results.get("l02")
     l47 = layer_results.get("l47")
+    l49 = layer_results.get("l49")
     SEUIL = 6.0
+    SEUIL_AGREGE = 5.0
 
     if l2 is None and l47 is None:
         return "rejected", 0.0, 0.0, ["Aucune couche"]
+
+    # VETO si L49 (agrégat L31+L35+L47) trop bas
+    if l49 is not None and not l49.rejected and l49.score < SEUIL_AGREGE:
+        return "rejected", 0.0, 0.0, [f"L49 trop bas ({l49.score:.1f} < {SEUIL_AGREGE})"]
 
     # Calcule EG et P(Over) via Poisson
     eg = None
@@ -206,11 +166,11 @@ def _signal_from(score: float, edge: float | None, cote: float | None, proba: fl
             return "weak_nocote"
         return "rejected"
 
-    if score >= 6.0 and edge is not None and edge >= 0.05:
+    if score >= 6.0 and edge is not None and edge >= 0.03:
         return "strong"
-    if score >= 5.0 and edge is not None and edge >= 0.03:
+    if score >= 5.0 and edge is not None and edge >= 0.02:
         return "medium"
-    if score >= 4.0 and edge is not None and edge >= 0.02:
+    if score >= 4.0 and edge is not None and edge >= 0.01:
         return "weak"
     return "rejected"
 
@@ -252,6 +212,14 @@ def run_match(match: dict, ctx: dict, bankroll: float = 1000.0) -> dict:
         if l35 and l35.rejected:
             reasons.append(f"L35: {l35.warnings[:1]}")
         return _rejected_dict(match, "VETO " + ", ".join(reasons), results)
+
+    # 3.b NOUVEAU : calcule kscoring (agrégation bayésienne)
+    weights = _weights_for(results)
+    agg = kscoring.kscore_layers(results, weights) if weights else None
+
+    # Si VETO global (une couche a rejeté), rejet
+    if agg and agg.get("veto"):
+        return _rejected_dict(match, f"VETO kscoring : {agg.get('rejected_layers')}", results)
 
     # 4. Décision marché
     market, proba, score, warnings = _decide_market(results, match)
