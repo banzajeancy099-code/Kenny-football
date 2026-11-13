@@ -124,16 +124,17 @@ def api_predictions():
     # SÉLECTION PARIS DU JOUR (top 10 par edge)
     # ─────────────────────────────────────────
     TOP_N = 10
-    EDGE_MIN = 0.05
+    EDGE_MIN = 0.03
 
     # Filtre sur le marché réel (over ou under)
     def _cote_for_market(m):
         market = m.get("market") or "over"
         return m.get("cote_under") if market == "under" else m.get("cote_over")
     
+    # Éligible : signal strong/medium + cote valide
     eligible = [
         m for m in enriched
-        if m["signal"] == "strong"
+        if m["signal"] in ("strong", "medium")
         and m["edge"] is not None
         and m["edge"] >= EDGE_MIN
         and _cote_for_market(m) is not None
@@ -143,17 +144,39 @@ def api_predictions():
     # Trie par edge décroissant
     eligible.sort(key=lambda m: m["edge"] or 0, reverse=True)
 
-    # Top 10
-    paris_du_jour = eligible[:TOP_N]
-    pj_ids = {m["match_id"] for m in paris_du_jour}
-
-    # Confiance moyenne = les autres matchs (strong hors top, medium, etc.)
+    # ─────────────────────────────────────────
+    # CARTES GOLD : edge >= 7%, par paquets de 10
+    # ─────────────────────────────────────────
+    EDGE_GOLD = 0.07
+    CARD_SIZE = 10
+    
+    top_paris = [m for m in eligible if m["edge"] >= EDGE_GOLD]
+    autres_paris = [m for m in eligible if m["edge"] < EDGE_GOLD]
+    
+    # Accueil = tous les paris NON gold (autres_paris + confiance moyenne)
+    accueil_paris = autres_paris
+    
+    # Découpe en cartes de 10
+    gold_cards = []
+    for i in range(0, len(top_paris), CARD_SIZE):
+        gold_cards.append({
+            "card_num": len(gold_cards) + 1,
+            "paris": top_paris[i:i+CARD_SIZE],
+        })
+    
+    # IDs des top paris (pour exclusion)
+    top_ids = {m["match_id"] for m in top_paris}
+    
+    # Confiance moyenne = les autres matchs (edge < 7% ou signal medium)
     confiance_moyenne = [
         m for m in enriched
-        if m["match_id"] not in pj_ids
+        if m["match_id"] not in top_ids
         and m["signal"] in ("strong", "medium")
         and m["result_verdict"] is None
     ]
+    
+    # Pour compatibilité : paris_du_jour = top_paris
+    paris_du_jour = top_paris
 
     # Historique = uniquement les matchs avec verdict (J-1 et avant)
     corrects = [m for m in enriched if m["result_verdict"] == "✓"]
@@ -162,11 +185,18 @@ def api_predictions():
 
     return jsonify({
         "date": date,
-        "paris_du_jour": paris_du_jour,
+        "gold_cards": gold_cards,
+        "top_paris": top_paris,
+        "autres_paris": autres_paris,
+        "accueil_paris": accueil_paris,
         "confiance_moyenne": confiance_moyenne,
+        "paris_du_jour": paris_du_jour,  # compat
         "corrects": corrects,
         "rates": rates,
         "rejetes": rejetes,
+        "n_top": len(top_paris),
+        "n_autres": len(autres_paris),
+        "n_gold_cards": len(gold_cards),
         "n_paris_du_jour": len(paris_du_jour),
         "n_eligible": len(eligible),
     })
@@ -247,6 +277,21 @@ def api_archive():
         correct = sum(1 for m in formatted if m["result_verdict"] == "✓")
         wrong = sum(1 for m in formatted if m["result_verdict"] == "×")
 
+        # Calcule les stats de mise/gain
+        total_mise = 0
+        total_gain = 0
+        for m in formatted:
+            mise = m.get("mise_kelly", 0) or 0
+            cote = m.get("cote_over") or m.get("cote_under") or 1
+            if m.get("result_verdict") == "✓":
+                total_mise += mise
+                total_gain += mise * (cote - 1)
+            elif m.get("result_verdict") == "×":
+                total_mise += mise
+                total_gain -= mise
+
+        roi = (total_gain / total_mise * 100) if total_mise > 0 else 0
+
         days.append({
             "date": date_str,
             "correct": correct,
@@ -255,6 +300,9 @@ def api_archive():
             "won": correct,
             "lost": wrong,
             "n_matchs": len(formatted),
+            "total_mise": round(total_mise, 2),
+            "total_gain": round(total_gain, 2),
+            "roi": round(roi, 1),
             "matches": formatted,
         })
 

@@ -1874,7 +1874,7 @@ async function loadHome() {
                     </div>`;
 
                 if (accueil.length === 0) {
-                    html += '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun pari gold (edge ≥ 7%)</div>';
+                    html += '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun autre pari</div>';
                 } else {
                     accueil.forEach(m => {
                         html += `<div class="card p-3 mb-3 border-2 border-yellow-500/30">
@@ -2043,11 +2043,13 @@ async function loadHome() {
             const selectedDate = document.getElementById('history-date-picker')?.value || '';
 
             try {
-                // Charge les 5 derniers jours
                 const r = await fetch('/api/archive?limit=5');
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 const data = await r.json();
                 const days = data.days || [];
+
+                // Stocke les données pour showCollection
+                window.historyData = days;
 
                 let html = '';
 
@@ -2062,7 +2064,7 @@ async function loadHome() {
                     </div>
                 </div>`;
 
-                // 5 cartes (5 derniers jours)
+                // 5 cartes pro
                 if (days.length === 0) {
                     html += '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun historique disponible</div>';
                 } else {
@@ -2071,15 +2073,28 @@ async function loadHome() {
                         const won = day.won || 0;
                         const lost = day.lost || 0;
                         const accuracy = total > 0 ? Math.round((won / total) * 100) : 0;
+                        const isWin = won > lost;
+                        const isLoss = lost > won;
+                        const colorClass = isWin ? 'border-green-500/30' : isLoss ? 'border-red-500/30' : 'border-yellow-500/30';
+                        const bgClass = isWin ? 'bg-green-500/5' : isLoss ? 'bg-red-500/5' : 'bg-yellow-500/5';
+                        const emoji = isWin ? '🟢' : isLoss ? '🔴' : '🟡';
+                        const totalMise = day.total_mise || 0;
+                        const totalGain = day.total_gain || 0;
+                        const roi = day.roi || 0;
 
-                        html += `<div class="history-card-pro ${won > lost ? 'win' : lost > won ? 'loss' : 'pending'}" 
+                        html += `<div class="card p-4 mb-3 cursor-pointer hover:scale-[1.02] transition border-2 ${colorClass} ${bgClass}" 
                                       onclick="showCollection('${day.date}')"
-                                      style="animation-delay: ${idx * 0.1}s">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-sm font-bold text-white">${day.date}</span>
-                                <span class="text-xs text-neutral-400">${total} paris</span>
+                                      style="animation-delay: ${idx * 0.05}s">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-lg">${emoji}</span>
+                                    <span class="text-sm font-bold text-white">${day.date}</span>
+                                </div>
+                                <span class="text-xs px-2 py-1 rounded-full ${isWin ? 'bg-green-500/20 text-green-400' : isLoss ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}">
+                                    ${total} paris
+                                </span>
                             </div>
-                            <div class="grid grid-cols-3 gap-2 text-center">
+                            <div class="grid grid-cols-4 gap-2 text-center">
                                 <div>
                                     <div class="text-lg font-bold text-green-400">${won}</div>
                                     <div class="text-[10px] text-neutral-500">Corrects</div>
@@ -2092,18 +2107,26 @@ async function loadHome() {
                                     <div class="text-lg font-bold text-white">${accuracy}%</div>
                                     <div class="text-[10px] text-neutral-500">Précision</div>
                                 </div>
+                                <div>
+                                    <div class="text-lg font-bold ${roi >= 0 ? 'text-green-400' : 'text-red-400'}">${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%</div>
+                                    <div class="text-[10px] text-neutral-500">ROI</div>
+                                </div>
                             </div>
+                            ${totalMise > 0 ? `<div class="mt-2 pt-2 border-t border-white/10 flex justify-between text-xs">
+                                <span class="text-neutral-500">Mise: ${totalMise.toFixed(0)}€</span>
+                                <span class="${totalGain >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
+                                    ${totalGain >= 0 ? '+' : ''}${totalGain.toFixed(2)}€
+                                </span>
+                            </div>` : ''}
                         </div>`;
                     });
                 }
 
                 el.innerHTML = html;
-
             } catch (e) {
                 el.innerHTML = `<div class="card p-6 text-center text-red-400">Erreur : ${e.message}</div>`;
             }
         }
-
 
         async function handleAnalyze(btn) {
             if (btn.classList.contains('loading')) return;
