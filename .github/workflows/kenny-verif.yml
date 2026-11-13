@@ -1,0 +1,23 @@
+name: Kenny Verif
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Vérification résultats J-1
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BZZOIRO_API_KEY: ${{ secrets.BZZOIRO_API_KEY }}
+          BZZOIRO_API_KEY_5: ${{ secrets.BZZOIRO_API_KEY_5 }}
+          PYTHONPATH: src
+        run: python -m jobs.kjob_verif $(date -u -d 'yesterday' +%Y-%m-%d)

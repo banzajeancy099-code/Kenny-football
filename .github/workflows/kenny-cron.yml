@@ -10,7 +10,7 @@ jobs:
   analyse:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: github.event.schedule == '55 23 * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule != '0 4 * * *'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

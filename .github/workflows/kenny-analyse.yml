@@ -1,0 +1,27 @@
+name: Kenny Analyse
+
+on:
+  workflow_dispatch:
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Analyse du jour
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BZZOIRO_API_KEY: ${{ secrets.BZZOIRO_API_KEY }}
+          BZZOIRO_API_KEY_5: ${{ secrets.BZZOIRO_API_KEY_5 }}
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          PITCH_API_KEY: ${{ secrets.PITCH_API_KEY }}
+          PINNAPI_KEY: ${{ secrets.PINNAPI_KEY }}
+          PYTHONPATH: src
+        run: python -m jobs.kjob_analyse $(date +%Y-%m-%d)
