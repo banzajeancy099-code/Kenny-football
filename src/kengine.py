@@ -40,6 +40,40 @@ LEAGUES_OVER = {
     1, 2, 3, 6, 12, 15, 22, 24, 26, 28, 49, 50, 55,
     57, 82, 86, 87, 89, 91, 95, 97, 98, 99, 100, 101,
     102, 103, 104, 105, 106, 107, 108, 109,
+    # AJOUTS (toutes sauf amicaux 31 et 79)
+    9,    # Brasileirão Serie A
+    20,   # Liga MX Clausura
+    23,   # Superliga (Roumanie)
+    27,   # World Cup 2026
+    29,   # CAF Champions League
+    30,   # Africa Cup of Nations 2023
+    32,   # Copa Libertadores
+    33,   # Copa Sudamericana
+    39,   # FA Cup
+    40,   # Carabao Cup
+    41,   # Copa del Rey
+    42,   # Coppa Italia
+    44,   # Coupe de France
+    46,   # Puchar Polski
+    47,   # Tunisian Ligue Professionnelle 1
+    48,   # Coupe de Tunisie
+    51,   # Emperor Cup
+    59,   # World Cup Qualification CONMEBOL
+    60,   # World Cup Qualification CAF
+    61,   # World Cup Qualification AFC
+    62,   # World Cup Qualification CONCACAF
+    63,   # World Cup Qualification OFC
+    65,   # CONCACAF Nations League
+    66,   # UEFA Euro 2024
+    67,   # Copa America 2024
+    68,   # AFC Asian Cup 2023
+    69,   # CONCACAF Gold Cup 2025
+    71,   # UEFA European U19 Championship
+    81,   # Copa Colombia
+    88,   # Liga Portugal 2
+    90,   # UEFA Super Cup
+    93,   # Taça da Liga
+    110,  # Ziraat Turkiye Kupasi
 }
 
 LEAGUES_UNDER = {
@@ -128,20 +162,40 @@ def _decide_market(layer_results: dict, match: dict = None) -> tuple[str, float,
         p_over = 1 - p0 * (1 + eg + eg**2 / 2)
         p_under = 1 - p_over
 
-    # Over prioritaire
+    # Récupère les cotes
+    cote_over = match.get("cote_over") if match else None
+    cote_under = match.get("cote_under") if match else None
+
+    # Over prioritaire (si cote over >= 1.40)
     if l2 is not None and not l2.rejected and l2.score >= SEUIL:
-        return "over", min(p_over, 0.95), l2.score, [f"Over (EG={eg:.2f}, P={p_over:.1%})"]
+        if cote_over is not None and cote_over >= 1.40 and cote_over <= 2.50:
+            return "over", min(p_over, 0.95), l2.score, [f"Over (EG={eg:.2f}, P={p_over:.1%})"]
+        elif cote_over is not None and cote_over < 1.40:
+            # Cote over trop basse → rejet (pas de basculement)
+            return "rejected", 0.0, 0.0, [f"Cote over {cote_over} < 1.40 → rejet"]
+        elif cote_over is not None and cote_over > 2.50:
+            # Cote over trop haute → bascule Under
+            warnings.append(f"Cote over {cote_over} > 2.50 → bascule Under")
 
     if l2 is not None and l2.rejected:
         warnings.append(f"L2 rejetée : {l2.warnings[:2]}")
 
-    # Under fallback
+    # Under fallback (avec basculement)
     if l47 is None:
         return "rejected", 0.0, 0.0, warnings + ["L47 absente"]
     if l47.rejected:
         return "rejected", 0.0, 0.0, warnings + [f"L47 rejetée : {l47.warnings[:2]}"]
     if l47.score >= SEUIL:
-        return "under", min(p_under, 0.95), l47.score, warnings + [f"Under (EG={eg:.2f}, P={p_under:.1%})"]
+        if cote_under is not None and 1.40 <= cote_under <= 2.50:
+            return "under", min(p_under, 0.95), l47.score, warnings + [f"Under (EG={eg:.2f}, P={p_under:.1%})"]
+        elif cote_under is not None and cote_under < 1.40:
+            return "rejected", 0.0, 0.0, warnings + [f"Cote under {cote_under} < 1.40 → rejet"]
+        elif cote_under is not None and cote_under > 2.50:
+            warnings.append(f"Cote under {cote_under} > 2.50 → bascule Over")
+            # Bascule Over si L02 est ok
+            if l2 is not None and not l2.rejected and l2.score >= SEUIL:
+                if cote_over is not None and 1.40 <= cote_over <= 2.50:
+                    return "over", min(p_over, 0.95), l2.score, warnings + [f"Bascule Over (cote under {cote_under} > 2.50)"]
 
     return "rejected", 0.0, 0.0, warnings + ["Aucun marché valide"]
 
@@ -166,6 +220,10 @@ def _signal_from(score: float, edge: float | None, cote: float | None, proba: fl
             return "weak_nocote"
         return "rejected"
 
+    # NOUVEAU : si score >= 7.0, accepter même avec edge faible
+    if score >= 7.0:
+        return "strong"  # score très élevé = confiance
+    
     if score >= 6.0 and edge is not None and edge >= 0.03:
         return "strong"
     if score >= 5.0 and edge is not None and edge >= 0.02:
@@ -179,11 +237,26 @@ def _signal_from(score: float, edge: float | None, cote: float | None, proba: fl
 # VETO helper
 # ─────────────────────────────────────────
 def _rejected_dict(match, reason, layer_results=None):
+    # Récupère le score réel des couches (pas 0)
+    score = 0.0
+    if layer_results:
+        l2 = layer_results.get("l02")
+        l47 = layer_results.get("l47")
+        # Priorité : score de L02 ou L47 (le plus élevé)
+        if l2 and not l2.rejected:
+            score = l2.score
+        elif l47 and not l47.rejected:
+            score = l47.score
+    
     return {
         "match_id": match.get("match_id"),
         "market": "rejected",
         "signal": "rejected",
-        "score": 0.0, "proba": 0.0, "cote": None, "edge": None, "mise": 0.0,
+        "score": round(score, 2),
+        "proba": 0.0,
+        "cote": None,
+        "edge": None,
+        "mise": 0.0,
         "warnings": [reason],
         "layer_results": layer_results or {},
     }
@@ -199,7 +272,18 @@ def run_match(match: dict, ctx: dict, bankroll: float = 1000.0) -> dict:
     if ACTIVE_LEAGUES and league_id not in ACTIVE_LEAGUES:
         return _rejected_dict(match, f"Ligue {league_id} non configurée")
 
-    # 2. Exécute les couches
+    # 2. NOUVEAU : Détection fraude AVANT les couches
+    match_id = match.get("match_id")
+    if match_id:
+        try:
+            from scripts.detect_fraud_odds import detect_fraud
+            is_fraud, fraud_reasons = detect_fraud(match_id)
+            if is_fraud:
+                return _rejected_dict(match, f"FRAUDE détectée : {fraud_reasons}", None)
+        except Exception as e:
+            print(f"[kengine] detect_fraud KO : {e}")
+
+    # 3. Exécute les couches
     results = _run_layers(match, ctx)
 
     # 3. VETO dur si L31 ou L35 rejettent
@@ -218,8 +302,12 @@ def run_match(match: dict, ctx: dict, bankroll: float = 1000.0) -> dict:
     agg = kscoring.kscore_layers(results, weights) if weights else None
 
     # Si VETO global (une couche a rejeté), rejet
+    # EXCEPTION : L01 (standings) peut rejeter sans bloquer le pari
     if agg and agg.get("veto"):
-        return _rejected_dict(match, f"VETO kscoring : {agg.get('rejected_layers')}", results)
+        rejected = agg.get("rejected_layers") or []
+        critical_rejected = [r for r in rejected if r != "l01"]
+        if critical_rejected:
+            return _rejected_dict(match, f"VETO kscoring : {critical_rejected}", results)
 
     # 4. Décision marché
     market, proba, score, warnings = _decide_market(results, match)
@@ -232,16 +320,24 @@ def run_match(match: dict, ctx: dict, bankroll: float = 1000.0) -> dict:
 
     # 6. Cote correspondante
     cote = match.get("cote_under") if market == "under" else match.get("cote_over")
-
-    # 7. Filtre cote [1.40, 1.80]
-    # AUDIT v2 : cote élargie [1.40, 2.20] (ROI +11% à +35% sur les cotes 1.80-2.20 avec EG >= 3.5)
-    if cote is None or cote < 1.40 or cote > 2.20:
-        return _rejected_dict(match, f"Cote {cote} hors [1.40, 2.20]", results)
+    # 7. Filtre cote STRICT (Décision 6)
+    # - Si cote absente → rejet (même le jour du match)
+    # - Si cote hors [1.40, 2.50] → rejet
+    if cote is None:
+        return _rejected_dict(match, f"Cote absente → rejet", results)
+    
+    if cote < 1.40 or cote > 2.50:
+        return _rejected_dict(match, f"Cote {cote} hors [1.40, 2.50]", results)
 
     # 8. Signal + mise
-    edge = kkelly.kelly_edge(proba, cote)
-    signal = _signal_from(score, edge, cote, proba)
-    mise = kkelly.kelly_mise(proba, cote, signal, bankroll)
+    if cote is not None:
+        edge = kkelly.kelly_edge(proba, cote)
+        signal = _signal_from(score, edge, cote, proba)
+        mise = kkelly.kelly_mise(proba, cote, signal, bankroll)
+    else:
+        edge = None
+        signal = "strong_nocote" if score >= 7.0 else "rejected"
+        mise = 15.0 if signal == "strong_nocote" else 0.0
 
     # 9. Log feedback loop (sauf si skip)
     if not ctx.get("skip_layer_perf"):

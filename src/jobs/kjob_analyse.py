@@ -36,12 +36,37 @@ def analyse_du_jour(date_str: str = None):
     print(f"=== Analyse du {date_str} ===", flush=True)
 
     bzz = KBzzoiro()
+    # Charge les clients API (si clés dispo)
+    try:
+        from api.kapi_football import KAPIFootball
+        api_football = KAPIFootball()
+        print("✅ API-Football chargé", flush=True)
+    except Exception as e:
+        api_football = None
+        print(f"⚠️ API-Football KO : {e}", flush=True)
+
+    try:
+        from api.kpitchapi import KPitchAPI
+        pitchapi = KPitchAPI()
+        print("✅ PitchAPI chargé", flush=True)
+    except Exception as e:
+        pitchapi = None
+        print(f"⚠️ PitchAPI KO : {e}", flush=True)
+
+    try:
+        from api.kpinnacle import KPinnacle
+        pinnacle = KPinnacle()
+        print("✅ Pinnacle chargé", flush=True)
+    except Exception as e:
+        pinnacle = None
+        print(f"⚠️ Pinnacle KO : {e}", flush=True)
+
     ctx = {
         "bzzoiro": bzz,
-        "api_football": None,
+        "api_football": api_football,
         "odds": KOdds(bzzoiro=bzz),
-        "pitchapi": None,
-        "pinnacle": None,
+        "pitchapi": pitchapi,
+        "pinnacle": pinnacle,
         "db": kdb,
         "skip_layer_perf": True,
     }
@@ -66,6 +91,23 @@ def analyse_du_jour(date_str: str = None):
     matches_to_save = []
 
     for ev in events_typed:
+        # NOUVEAU : détection fraude AVANT l'analyse
+        try:
+            from scripts.detect_fraud_odds import detect_fraud
+            is_fraud, fraud_reasons = detect_fraud(
+                match_id=str(ev.get("id")),
+                home_team=ev.get("home_team") or "",
+                away_team=ev.get("away_team") or "",
+                league_id=ev.get("league_id"),
+                kickoff=ev.get("event_date") or "",
+                conn=None,
+            )
+            if is_fraud:
+                print(f"  🚨 FRAUDE : {ev.get('home_team')} vs {ev.get('away_team')} ({fraud_reasons})", flush=True)
+                continue
+        except Exception:
+            pass
+
         match = {
             "match_id": str(ev.get("id")),
             "fixture_id": ev.get("id"),
