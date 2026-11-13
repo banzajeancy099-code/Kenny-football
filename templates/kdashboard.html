@@ -1266,7 +1266,8 @@
         });
 
         function signalBadge(sig) {
-            const s = sig || 'rejected';
+            if (!sig) return '<span class="badge badge-pending">⏳ EN ATTENTE</span>';
+            const s = sig;
             const icons = {
                 "strong": "🔥",
                 "medium": "⭐",
@@ -1295,7 +1296,7 @@
             if (isOver) {
                 return `<span class="badge" style="background: rgba(0,123,255,0.2); color: #007BFF;">🎯 OVER</span>`;
             }
-            return signalBadge(m.signal_strength);
+            return signalBadge(m.signal);
         }
 
         function fmtMoney(v) { return (v || 0).toFixed(2) + '€'; }
@@ -1437,7 +1438,7 @@
                 html += '    <div class="flex flex-col items-center px-2">';
                 html += '      <div class="mono text-3xl font-extrabold text-accent">' + (m.score || 0).toFixed(2) + '</div>';
                 html += '      <div class="text-[9px] text-neutral-500 uppercase">VS</div>';
-                html += '      <div class="mt-1">' + signalBadge(m.signal_strength) + '</div>';
+                html += '      <div class="mt-1">' + signalBadge(m.signal) + '</div>';
                 html += '    </div>';
                 html += '    <div class="flex flex-col items-center flex-1 min-w-0">';
                 html += '      <div class="relative">';
@@ -1818,6 +1819,40 @@
             }
         }
 
+function showGoldCard(cardNum) {
+    const card = (window._goldCards || []).find(c => c.card_num === cardNum);
+    if (!card) {
+        alert("Carte introuvable");
+        return;
+    }
+
+    let html = '<div class="p-4">';
+    html += '<h3 class="text-lg font-bold text-white mb-4">🥇 Carte ' + cardNum + ' (' + card.paris.length + ' paris)</h3>';
+    html += '<table class="collection-table">';
+    html += '<thead><tr><th>Match</th><th>Marché</th><th>Cote</th><th>Edge</th><th>Mise</th></tr></thead>';
+    html += '<tbody>';
+
+    card.paris.forEach(m => {
+        const isOver = m.market === 'over';
+        const cote = isOver ? m.cote_over : m.cote_under;
+        const edgePct = (m.edge * 100).toFixed(1);
+        html += '<tr>';
+        html += '<td>' + m.home + ' vs ' + m.away + '</td>';
+        html += '<td>' + (isOver ? 'Over 2.5' : 'Under 2.5') + '</td>';
+        html += '<td class="mono">' + (cote ? cote.toFixed(2) : '—') + '</td>';
+        html += '<td class="mono text-yellow-400">' + edgePct + '%</td>';
+        html += '<td class="mono text-accent">' + (m.mise || 0).toFixed(2) + '€</td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    html += '</div>';
+
+    document.getElementById('match-modal').classList.remove('hidden');
+    document.getElementById('modal-title').textContent = 'Carte ' + cardNum;
+    document.getElementById('modal-content').innerHTML = html;
+}
+
 async function loadHome() {
             const el = document.getElementById('home-content');
             el.innerHTML = '<div class="card p-6 text-center text-neutral-400">Chargement...</div>';
@@ -1829,54 +1864,64 @@ async function loadHome() {
                 
                 let html = '';
                 
-                // === PARIS DU JOUR (top 10) ===
-                const paris = data.paris_du_jour || [];
+                // === ACCUEIL : MATCHS NON GOLD ===
+                const accueil = data.accueil_paris || data.autres_paris || [];
+                const nTop = data.n_top || 0;
                 html += `<div class="mb-6">
                     <div class="flex items-center justify-between mb-3">
                         <h2 class="text-xl font-bold text-white">🎯 Paris du Jour</h2>
-                        <span class="text-xs text-neutral-400">${paris.length} paris</span>
+                        <span class="text-xs text-neutral-400">${nTop} paris (edge ≥ 7%)</span>
                     </div>`;
-                
-                if (paris.length === 0) {
-                    html += '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun pari pour cette journée</div>';
+
+                if (accueil.length === 0) {
+                    html += '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun pari gold (edge ≥ 7%)</div>';
                 } else {
-                    paris.forEach(m => {
-                        const badge = signalBadge(m.signal);
-                        const marketBadge = getMarketBadge(m.market);
-                        const cote = m.market === 'under' ? m.cote_under : m.cote_over;
-                        const edgePct = m.edge ? (m.edge * 100).toFixed(1) : '—';
-                        
-                        html += `<div class="card p-4 mb-2 cursor-pointer hover:bg-cardHover transition" onclick="openMatch('${m.match_id}')">
+                    accueil.forEach(m => {
+                        html += `<div class="card p-3 mb-3 border-2 border-yellow-500/30">
                             <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center gap-2">
-                                    ${badge}
-                                    ${marketBadge}
+                                <h3 class="text-sm font-bold text-yellow-400">🥇 Carte ${} (${} paris)</h3>
+                                <span class="text-xs text-yellow-300">Gold</span>
+                            </div>`;
+                        
+                        
+                            const badge = signalBadge(m.signal);
+                            const marketBadge = getMarketBadge(m.market);
+                            const cote = m.market === 'under' ? m.cote_under : m.cote_over;
+                            const edgePct = m.edge ? (m.edge * 100).toFixed(1) : '—';
+
+                            html += `<div class="p-2 mb-1 cursor-pointer hover:bg-white/5 transition rounded" onclick="openMatch('${m.match_id}')">
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="flex items-center gap-1">
+                                        ${badge}
+                                        ${marketBadge}
+                                    </div>
+                                    <span class="text-xs text-neutral-400">Ligue ${m.league_id}</span>
                                 </div>
-                                <span class="text-xs text-neutral-400">Ligue ${m.league_id}</span>
-                            </div>
-                            <div class="font-bold text-white mb-1">${m.home || '?'} vs ${m.away || '?'}</div>
-                            <div class="flex items-center justify-between text-sm">
-                                <span class="text-neutral-400">${m.kickoff ? new Date(m.kickoff).toLocaleString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : ''}</span>
-                                <div class="flex items-center gap-3">
-                                    <span class="text-accent font-bold">${cote ? cote.toFixed(2) : '—'}</span>
-                                    <span class="text-xs text-neutral-500">edge ${edgePct}%</span>
-                                    <span class="text-xs font-bold text-green-400">${m.mise.toFixed(2)}€</span>
+                                <div class="text-sm font-bold text-white">${m.home || '?'} vs ${m.away || '?'}</div>
+                                <div class="flex items-center justify-between text-xs mt-1">
+                                    <span class="text-neutral-500">${m.kickoff ? new Date(m.kickoff).toLocaleString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : ''}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-accent font-bold">${cote ? cote.toFixed(2) : '—'}</span>
+                                        <span class="text-yellow-400 font-bold">edge ${edgePct}%</span>
+                                        <span class="text-green-400">${m.mise.toFixed(2)}€</span>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>`;
+                            </div>`;
+                        });
+                        html += '</div>';
                     });
                 }
                 html += '</div>';
                 
-                // === CONFIANCE MOYENNE ===
-                const moyenne = data.confiance_moyenne || [];
-                if (moyenne.length > 0) {
+                // === AUTRES PARIS (edge 3-7%) ===
+                const autres = data.autres_paris || [];
+                if (autres.length > 0) {
                     html += `<div class="mb-6">
                         <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold text-neutral-300">⚡ Confiance moyenne</h2>
-                            <span class="text-xs text-neutral-500">${moyenne.length} matchs</span>
+                            <h2 class="text-lg font-bold text-neutral-300">⚡ Autres paris</h2>
+                            <span class="text-xs text-neutral-500">${autres.length} matchs</span>
                         </div>`;
-                    moyenne.forEach(m => {
+                    autres.forEach(m => {
                         const badge = signalBadge(m.signal);
                         const marketBadge = getMarketBadge(m.market);
                         const cote = m.market === 'under' ? m.cote_under : m.cote_over;
@@ -1995,139 +2040,70 @@ async function loadHome() {
         async function loadHistory() {
             const el = document.getElementById('history-content');
             el.innerHTML = '<div class="card p-6 text-center text-neutral-400">Chargement...</div>';
-            
+
             const selectedDate = document.getElementById('history-date-picker')?.value || '';
-            const url = selectedDate ? '/api/predictions?date=' + selectedDate : '/api/predictions';
-            
+
             try {
-                const r = await fetch(url);
+                // Charge les 5 derniers jours
+                const r = await fetch('/api/archive?limit=5');
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 const data = await r.json();
-                
-                const corrects = data.corrects || [];
-                const rates = data.rates || [];
-                const rejetes = data.rejetes || [];
-                const paris = data.paris_du_jour || [];
-                
-                // Stats
-                const totalCorrect = corrects.length;
-                const totalWrong = rates.length;
-                const totalParis = totalCorrect + totalWrong;
-                const accuracy = totalParis > 0 ? Math.round((totalCorrect / totalParis) * 100) : 0;
-                
-                let html = `
-                    <div class="grid grid-cols-3 gap-2 mb-4">
-                        <div class="card p-3 text-center">
-                            <div class="text-2xl font-bold text-green-400">${totalCorrect}</div>
-                            <div class="text-xs text-neutral-400 uppercase">Corrects</div>
-                        </div>
-                        <div class="card p-3 text-center">
-                            <div class="text-2xl font-bold text-red-400">${totalWrong}</div>
-                            <div class="text-xs text-neutral-400 uppercase">Ratés</div>
-                        </div>
-                        <div class="card p-3 text-center">
-                            <div class="text-2xl font-bold text-white">${accuracy}%</div>
-                            <div class="text-xs text-neutral-400 uppercase">Précision</div>
-                        </div>
-                    </div>
-                `;
-                
+                const days = data.days || [];
+
+                let html = '';
+
                 // Sélecteur de date
                 html += `<div class="mb-4">
                     <div class="flex items-center gap-2 bg-card rounded-xl p-2 border border-white/10">
                         <span class="text-neutral-400 text-sm">📅</span>
-                        <input type="date" id="history-date-picker" 
-                               value="${selectedDate || data.date || ''}"
+                        <input type="date" id="history-date-picker"
+                               value="${selectedDate || new Date().toISOString().split('T')[0]}"
                                class="flex-1 bg-transparent text-white text-sm outline-none"
                                onchange="loadHistory()">
                     </div>
                 </div>`;
-                
-                // PARIS DU JOUR (ceux qui ont été pariés)
-                if (paris.length > 0) {
-                    html += `<div class="mb-4">
-                        <h3 class="text-sm font-bold text-blue-400 mb-2">🎯 Paris du jour (${paris.length})</h3>`;
-                    paris.forEach(m => {
-                        const badge = signalBadge(m.signal);
-                        const marketBadge = getMarketBadge(m.market);
-                        const cote = m.market === 'under' ? m.cote_under : m.cote_over;
-                        const verdict = m.result_verdict || '⏳';
-                        const verdictColor = verdict === '✓' ? 'text-green-400' : verdict === '×' ? 'text-red-400' : 'text-yellow-400';
-                        const verdictIcon = verdict === '✓' ? '✅' : verdict === '×' ? '❌' : '⏳';
-                        
-                        html += `<div class="card p-3 mb-2 cursor-pointer hover:bg-cardHover transition" onclick="openMatch('${m.match_id}')">
-                            <div class="flex items-center justify-between mb-1">
-                                <div class="flex items-center gap-2">
-                                    ${badge}
-                                    ${marketBadge}
-                                    <span class="${verdictColor} font-bold">${verdictIcon}</span>
+
+                // 5 cartes (5 derniers jours)
+                if (days.length === 0) {
+                    html += '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun historique disponible</div>';
+                } else {
+                    days.forEach((day, idx) => {
+                        const total = day.total || 0;
+                        const won = day.won || 0;
+                        const lost = day.lost || 0;
+                        const accuracy = total > 0 ? Math.round((won / total) * 100) : 0;
+
+                        html += `<div class="history-card-pro ${won > lost ? 'win' : lost > won ? 'loss' : 'pending'}" 
+                                      onclick="showCollection('${day.date}')"
+                                      style="animation-delay: ${idx * 0.1}s">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-bold text-white">${day.date}</span>
+                                <span class="text-xs text-neutral-400">${total} paris</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 text-center">
+                                <div>
+                                    <div class="text-lg font-bold text-green-400">${won}</div>
+                                    <div class="text-[10px] text-neutral-500">Corrects</div>
                                 </div>
-                                <span class="text-xs font-bold text-green-400">${m.mise.toFixed(2)}€</span>
-                            </div>
-                            <div class="text-sm font-medium text-white">${m.home || '?'} vs ${m.away || '?'}</div>
-                            <div class="flex justify-between text-xs mt-1">
-                                <span class="text-neutral-500">${cote ? cote.toFixed(2) : '—'}</span>
-                                <span class="text-neutral-400">Ligue ${m.league_id}</span>
-                            </div>
-                        </div>`;
-                    });
-                    html += `</div>`;
-                }
-                
-                // CORRECTS
-                if (corrects.length > 0) {
-                    html += `<div class="mb-4">
-                        <h3 class="text-sm font-bold text-green-400 mb-2">✅ Corrects (${corrects.length})</h3>`;
-                    corrects.forEach(m => {
-                        const marketBadge = getMarketBadge(m.market);
-                        const cote = m.market === 'under' ? m.cote_under : m.cote_over;
-                        html += `<div class="card p-2 mb-1 text-xs">
-                            <div class="flex items-center justify-between">
-                                <span class="text-neutral-300">${m.home || '?'} vs ${m.away || '?'}</span>
-                                <span class="text-neutral-500">${marketBadge} ${cote ? cote.toFixed(2) : '—'}</span>
+                                <div>
+                                    <div class="text-lg font-bold text-red-400">${lost}</div>
+                                    <div class="text-[10px] text-neutral-500">Ratés</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-bold text-white">${accuracy}%</div>
+                                    <div class="text-[10px] text-neutral-500">Précision</div>
+                                </div>
                             </div>
                         </div>`;
                     });
-                    html += `</div>`;
                 }
-                
-                // RATÉS
-                if (rates.length > 0) {
-                    html += `<div class="mb-4">
-                        <h3 class="text-sm font-bold text-red-400 mb-2">❌ Ratés (${rates.length})</h3>`;
-                    rates.forEach(m => {
-                        const marketBadge = getMarketBadge(m.market);
-                        const cote = m.market === 'under' ? m.cote_under : m.cote_over;
-                        html += `<div class="card p-2 mb-1 text-xs">
-                            <div class="flex items-center justify-between">
-                                <span class="text-neutral-300">${m.home || '?'} vs ${m.away || '?'}</span>
-                                <span class="text-neutral-500">${marketBadge} ${cote ? cote.toFixed(2) : '—'}</span>
-                            </div>
-                        </div>`;
-                    });
-                    html += `</div>`;
-                }
-                
-                // REJETÉS
-                if (rejetes.length > 0) {
-                    html += `<div class="mb-4">
-                        <h3 class="text-sm font-bold text-neutral-500 mb-2">⚠️ Rejetés (${rejetes.length})</h3>`;
-                    rejetes.forEach(m => {
-                        html += `<div class="card p-2 mb-1 text-xs">
-                            <div class="flex items-center justify-between">
-                                <span class="text-neutral-400">${m.home || '?'} vs ${m.away || '?'}</span>
-                                <span class="text-neutral-600">Ligue ${m.league_id}</span>
-                            </div>
-                        </div>`;
-                    });
-                    html += `</div>`;
-                }
-                
+
                 el.innerHTML = html;
-                
+
             } catch (e) {
-                el.innerHTML = '<div class="card p-6 text-center text-red-400 text-sm">Erreur : ' + e.message + '</div>';
+                el.innerHTML = `<div class="card p-6 text-center text-red-400">Erreur : ${e.message}</div>`;
             }
+        }
         }
 
 
