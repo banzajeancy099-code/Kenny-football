@@ -1522,71 +1522,60 @@
         }
 
         
-        function openParisJour() {
-            const el = document.getElementById('paris-jour-view');
-            if (el) el.remove();
+        async function openParisJour() {
+            // Charge les gold_cards
+            try {
+                const r = await fetch('/api/predictions');
+                const data = await r.json();
+                const goldCards = data.gold_cards || [];
 
-            const view = document.createElement('div');
-            view.id = 'paris-jour-view';
+                if (goldCards.length === 0) {
+                    alert("Aucune carte gold (edge ≥ 7%) pour cette journée.");
+                    return;
+                }
 
-            fetch('/api/predictions')
-                .then(r => r.json())
-                .then(data => {
-                    const allMatches = data.matches || [];
-                    const paris = allMatches.filter(m => 
-                        (Number(m.mise_kelly || 0) > 0) || (Number(m.mise_under || 0) > 0)
-                    );
+                // Crée une modale avec toutes les cartes
+                let html = '<div class="p-4">';
+                html += '<h2 class="text-xl font-bold text-white mb-4">🎯 Paris du Jour</h2>';
 
-                    let coteTotale = 1;
-                    let rows = '';
-                    let nbParis = 0;
+                goldCards.forEach(card => {
+                    html += `<div class="card p-4 mb-3 border-2 border-yellow-500/30">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-bold text-yellow-400">🥇 Carte ${card.card_num} (${card.paris.length} paris)</h3>
+                            <span class="text-xs text-yellow-300">Gold</span>
+                        </div>
+                        <table class="collection-table">
+                            <thead><tr><th>Match</th><th>Marché</th><th>Cote</th><th>Edge</th><th>Mise</th></tr></thead>
+                            <tbody>`;
 
-                    paris.forEach(m => {
-                        const isOver = (Number(m.mise_kelly) || 0) > 0;
-                        const mise = isOver ? m.mise_kelly : m.mise_under;
+                    card.paris.forEach(m => {
+                        const isOver = m.market === 'over';
                         const cote = isOver ? m.cote_over : m.cote_under;
-                        
-                        if (cote) {
-                            coteTotale *= Number(cote);
-                            nbParis++;
-                        }
-
-                        rows += `<tr>
-                            <td><strong>${m.home}</strong> vs ${m.away}</td>
-                            <td>${isOver ? '<span style="color:var(--blue-electric)">Over</span>' : '<span style="color:var(--red-neon)">Under</span>'}</td>
-                            <td>${cote ? Number(cote).toFixed(2) : '—'}</td>
-                            <td>${Number(mise).toFixed(2)}€</td>
+                        const edgePct = (m.edge * 100).toFixed(1);
+                        html += `<tr>
+                            <td>${m.home} vs ${m.away}</td>
+                            <td>${isOver ? 'Over 2.5' : 'Under 2.5'}</td>
+                            <td class="mono">${cote ? cote.toFixed(2) : '—'}</td>
+                            <td class="mono text-yellow-400">${edgePct}%</td>
+                            <td class="mono text-accent">${(m.mise || 0).toFixed(2)}€</td>
                         </tr>`;
                     });
 
-                    const montantBaseFC = 2000;
-                    const gainTotalFC = coteTotale * montantBaseFC;
+                    html += '</tbody></table></div>';
+                });
 
-                    view.innerHTML = `
-                        <div style="display:flex; align-items:center; margin-bottom:20px;">
-                            <button class="btn-return" onclick="document.getElementById('paris-jour-view').remove()">← Retour</button>
-                            <h2 style="margin-left:16px; font-size:20px; font-weight:800; color:white;">🎯 Paris du Jour</h2>
-                        </div>
+                html += '</div>';
 
-                        <table class="pari-table">
-                            <thead><tr><th>Match</th><th>Marché</th><th>Cote</th><th>Mise</th></tr></thead>
-                            <tbody>${rows}</tbody>
-                        </table>
+                document.getElementById('match-modal').classList.remove('hidden');
+                document.getElementById('modal-title').textContent = '🎯 Paris du Jour (Gold)';
+                document.getElementById('modal-content').innerHTML = html;
 
-                        <div class="pari-total">
-                            <div class="pari-total-row"><span>Nombre de paris</span><strong>${nbParis}</strong></div>
-                            <div class="pari-total-row"><span>Cote totale</span><strong>${coteTotale.toFixed(2)}</strong></div>
-                            <div class="pari-total-row"><span>Mise de base</span><strong>${montantBaseFC.toLocaleString()} FC</strong></div>
-                            <div class="pari-total-row big"><span>Gain potentiel</span><strong>${gainTotalFC.toLocaleString()} FC</strong></div>
-                        </div>
-                    `;
-                    
-                    // Ajouter la vue au DOM
-                    document.body.appendChild(view);
-                })
-                .catch(e => alert("Erreur: " + e.message));
+            } catch (e) {
+                alert("Erreur : " + e.message);
+            }
         }
 
+        
         function closeModal() {
             document.getElementById('match-modal').classList.add('hidden');
         }
