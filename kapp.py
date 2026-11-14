@@ -156,13 +156,50 @@ def api_predictions():
     # Accueil = tous les paris NON gold (autres_paris + confiance moyenne)
     accueil_paris = autres_paris
     
-    # Découpe en cartes de 10
+    # Découpe en cartes équilibrées (10 max par carte)
     gold_cards = []
-    for i in range(0, len(top_paris), CARD_SIZE):
-        gold_cards.append({
-            "card_num": len(gold_cards) + 1,
-            "paris": top_paris[i:i+CARD_SIZE],
-        })
+    n_top_paris = len(top_paris)
+    
+    if n_top_paris == 0:
+        gold_cards = []
+    else:
+        # Calcule le nombre de cartes
+        n_cards = (n_top_paris + CARD_SIZE - 1) // CARD_SIZE  # ceil
+        # Taille équilibrée
+        base_size = n_top_paris // n_cards
+        remainder = n_top_paris % n_cards
+        
+        start = 0
+        for i in range(n_cards):
+            # Les `remainder` premières cartes ont 1 paris de plus
+            size = base_size + (1 if i < remainder else 0)
+            card_paris = top_paris[start:start+size]
+            
+            # Calcule cote totale (produit)
+            cote_totale = 1.0
+            mise_totale_eur = 0.0
+            for m in card_paris:
+                market = m.get("market")
+                cote = m.get("cote_under") if market == "under" else m.get("cote_over")
+                if cote:
+                    cote_totale *= cote
+                mise = m.get("mise") or 0
+                mise_totale_eur += mise
+            
+            # Mise en FC (1000 FC par défaut)
+            mise_fc = 1000
+            gain_total_fc = cote_totale * mise_fc
+            
+            gold_cards.append({
+                "card_num": i + 1,
+                "paris": card_paris,
+                "n_paris": len(card_paris),
+                "cote_totale": round(cote_totale, 2),
+                "mise_totale_eur": round(mise_totale_eur, 2),
+                "mise_fc": mise_fc,
+                "gain_total_fc": round(gain_total_fc, 0),
+            })
+            start += size
     
     # IDs des top paris (pour exclusion)
     top_ids = {m["match_id"] for m in top_paris}
