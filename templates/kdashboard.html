@@ -1380,6 +1380,152 @@
             color: #FFF;
         }
 
+
+        /* === BACKGROUND FUTURISTE === */
+        body {
+            background-image: url('/static/images/cyberpunk-bg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            min-height: 100vh;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(10, 10, 30, 0.85) 100%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        /* === CARTES GOLD FUTURISTES (style Allstream) === */
+        .gold-card-futuristic {
+            background: linear-gradient(135deg, rgba(10, 10, 25, 0.95) 0%, rgba(20, 20, 40, 0.95) 100%);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 
+                0 0 40px rgba(138, 43, 226, 0.3),
+                0 0 80px rgba(0, 123, 255, 0.2),
+                0 8px 32px rgba(0, 0, 0, 0.6);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .gold-card-futuristic::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            padding: 2px;
+            background: linear-gradient(135deg, #8A2BE2, #007BFF, #FFD700, #8A2BE2);
+            background-size: 300% 300%;
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            animation: border-glow 4s ease infinite;
+        }
+        
+        @keyframes border-glow {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .gold-card-futuristic:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 
+                0 0 60px rgba(138, 43, 226, 0.5),
+                0 0 100px rgba(0, 123, 255, 0.3),
+                0 12px 48px rgba(0, 0, 0, 0.8);
+        }
+        
+        .gold-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        
+        .gold-badge {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            font-weight: 900;
+            font-size: 10px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+            animation: pulse-gold 2s infinite;
+        }
+        
+        @keyframes pulse-gold {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.6); }
+            50% { box-shadow: 0 0 40px rgba(255, 215, 0, 1); }
+        }
+        
+        .gold-card-title {
+            font-size: 22px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #FFD700, #FFA500, #8A2BE2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .gold-card-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .gold-stat {
+            background: rgba(138, 43, 226, 0.1);
+            border: 1px solid rgba(138, 43, 226, 0.3);
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+        }
+        
+        .gold-stat-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            color: #A3A3A3;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+        
+        .gold-stat-value {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: 900;
+            color: #FFF;
+        }
+        
+        /* Détail carte (plein écran) */
+        .gold-detail-screen {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(10, 10, 30, 0.95));
+            z-index: 9999;
+            overflow-y: auto;
+            padding: 20px;
+            display: none;
+        }
+        
+        .gold-detail-screen.active {
+            display: block;
+        }
+
 </style>
 </head>
 <body>
@@ -1866,57 +2012,33 @@
                 const goldCards = data.gold_cards || [];
 
                 if (goldCards.length === 0) {
-                    alert("Aucune carte gold (edge ≥ 7%) pour cette journée.");
+                    alert("Aucune carte gold pour cette journée.");
                     return;
                 }
 
                 let html = '<div class="p-4">';
-                html += `<h2 class="text-2xl font-bold text-yellow-400 mb-4">🎯 Paris du Jour (Gold)</h2>`;
-                html += `<p class="text-sm text-neutral-400 mb-4">${data.n_top} paris · ${goldCards.length} carte(s) · edge ≥ 7%</p>`;
+                html += `<h2 class="text-2xl font-bold text-white mb-2">🎯 Paris du Jour</h2>`;
+                html += `<p class="text-sm text-neutral-400 mb-6">${data.n_top} paris · ${goldCards.length} carte(s) · edge ≥ 7%</p>`;
 
                 goldCards.forEach(card => {
-                    html += `<div class="gold-card-futuristic mb-6">
+                    html += `<div class="gold-card-futuristic" onclick="showGoldCardDetail(${card.card_num})">
                         <div class="gold-card-header">
                             <span class="gold-badge">🥇 GOLD</span>
-                            <h3 class="text-lg font-bold text-yellow-400">Carte ${card.card_num}</h3>
-                            <span class="text-xs text-neutral-400">${card.n_paris} paris</span>
+                            <span class="text-xs text-neutral-400">${card.n_paris} matchs</span>
                         </div>
-                        <table class="gold-table">
-                            <thead>
-                                <tr>
-                                    <th>Match</th>
-                                    <th>Prédiction</th>
-                                    <th>Cote</th>
-                                    <th>Edge</th>
-                                </tr>
-                            </thead>
-                            <tbody>`;
-
-                    card.paris.forEach(m => {
-                        const isOver = m.market === 'over';
-                        const cote = isOver ? m.cote_over : m.cote_under;
-                        const edgePct = (m.edge * 100).toFixed(1);
-                        html += `<tr>
-                            <td>${m.home} vs ${m.away}</td>
-                            <td><span class="badge-market ${isOver ? 'over' : 'under'}">${isOver ? 'OVER 2.5' : 'UNDER 2.5'}</span></td>
-                            <td class="mono text-white">${cote ? cote.toFixed(2) : '—'}</td>
-                            <td class="mono text-yellow-400">${edgePct}%</td>
-                        </tr>`;
-                    });
-
-                    html += `</tbody></table>
-                        <div class="gold-total-case-pro">
-                            <div class="gold-total-line">
-                                <span class="gold-total-label">COTES</span>
-                                <span class="gold-total-value text-yellow-400">${card.cote_totale}</span>
+                        <div class="gold-card-title">Carte ${card.card_num}</div>
+                        <div class="gold-card-stats">
+                            <div class="gold-stat">
+                                <div class="gold-stat-label">Cotes totales</div>
+                                <div class="gold-stat-value text-yellow-400">${card.cote_totale}</div>
                             </div>
-                            <div class="gold-total-line">
-                                <span class="gold-total-label">MISE</span>
-                                <span class="gold-total-value">${card.mise_fc.toLocaleString()} FC</span>
+                            <div class="gold-stat">
+                                <div class="gold-stat-label">Mise</div>
+                                <div class="gold-stat-value">${card.mise_fc.toLocaleString()} FC</div>
                             </div>
-                            <div class="gold-total-line">
-                                <span class="gold-total-label">GAINS POTENTIELS</span>
-                                <span class="gold-total-value text-green-400">${card.gain_total_fc.toLocaleString()} FC</span>
+                            <div class="gold-stat">
+                                <div class="gold-stat-label">Gain potentiel</div>
+                                <div class="gold-stat-value text-green-400">${card.gain_total_fc.toLocaleString()}</div>
                             </div>
                         </div>
                     </div>`;
@@ -1927,6 +2049,64 @@
                 document.getElementById('match-modal').classList.remove('hidden');
                 document.getElementById('modal-title').textContent = '🎯 Paris du Jour';
                 document.getElementById('modal-content').innerHTML = html;
+
+            } catch (e) {
+                alert("Erreur : " + e.message);
+            }
+        }
+
+        async function showGoldCardDetail(cardNum) {
+            try {
+                const r = await fetch('/api/predictions');
+                const data = await r.json();
+                const card = (data.gold_cards || []).find(c => c.card_num === cardNum);
+                
+                if (!card) {
+                    alert("Carte introuvable");
+                    return;
+                }
+
+                let html = '<div class="p-4">';
+                html += `<div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-yellow-400">🥇 Carte ${cardNum}</h2>
+                    <button onclick="closeModal()" class="text-white text-2xl">×</button>
+                </div>`;
+                
+                html += '<table class="collection-table">';
+                html += '<thead><tr><th>Match</th><th>Prédiction</th><th>Cote</th><th>Edge</th></tr></thead>';
+                html += '<tbody>';
+
+                card.paris.forEach(m => {
+                    const isOver = m.market === 'over';
+                    const cote = isOver ? m.cote_over : m.cote_under;
+                    const edgePct = (m.edge * 100).toFixed(1);
+                    html += '<tr>';
+                    html += '<td>' + m.home + ' vs ' + m.away + '</td>';
+                    html += '<td>' + (isOver ? 'OVER 2.5' : 'UNDER 2.5') + '</td>';
+                    html += '<td class="mono">' + (cote ? cote.toFixed(2) : '—') + '</td>';
+                    html += '<td class="mono text-yellow-400">' + edgePct + '%</td>';
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+                html += `<div class="gold-total-case-pro">
+                    <div class="gold-total-line">
+                        <span class="gold-total-label">COTES</span>
+                        <span class="gold-total-value text-yellow-400">${card.cote_totale}</span>
+                    </div>
+                    <div class="gold-total-line">
+                        <span class="gold-total-label">MISE</span>
+                        <span class="gold-total-value">${card.mise_fc.toLocaleString()} FC</span>
+                    </div>
+                    <div class="gold-total-line">
+                        <span class="gold-total-label">GAINS POTENTIELS</span>
+                        <span class="gold-total-value text-green-400">${card.gain_total_fc.toLocaleString()} FC</span>
+                    </div>
+                </div>`;
+                html += '</div>';
+
+                document.getElementById('modal-content').innerHTML = html;
+                document.getElementById('modal-title').textContent = 'Carte ' + cardNum;
 
             } catch (e) {
                 alert("Erreur : " + e.message);
@@ -2210,54 +2390,6 @@ async function loadHome() {
                 const data = await r.json();
                 
                 let html = '';
-                
-                // === ACCUEIL : MATCHS NON GOLD ===
-                const accueil = data.accueil_paris || data.autres_paris || [];
-                const nTop = data.n_top || 0;
-                html += `<div class="mb-6">
-                    <div class="flex items-center justify-between mb-3">
-                        <h2 class="text-xl font-bold text-white">🎯 Paris du Jour</h2>
-                        <span class="text-xs text-neutral-400">${nTop} paris (edge ≥ 7%)</span>
-                    </div>`;
-
-                if (accueil.length === 0) {
-                    html += '<div class="card p-6 text-center text-neutral-500 text-sm">Aucun autre pari</div>';
-                } else {
-                    accueil.forEach(m => {
-                        html += `<div class="card p-3 mb-3 border-2 border-yellow-500/30">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm font-bold text-yellow-400">🥇 Carte gold</h3>
-                                <span class="text-xs text-yellow-300">Gold</span>
-                            </div>`;
-                        
-                        
-                            const badge = signalBadge(m.signal);
-                            const marketBadge = getMarketBadge(m.market);
-                            const cote = m.market === 'under' ? m.cote_under : m.cote_over;
-                            const edgePct = m.edge ? (m.edge * 100).toFixed(1) : '—';
-
-                            html += `<div class="p-2 mb-1 cursor-pointer hover:bg-white/5 transition rounded" onclick="openMatch('${m.match_id}')">
-                                <div class="flex items-center justify-between mb-1">
-                                    <div class="flex items-center gap-1">
-                                        ${badge}
-                                        ${marketBadge}
-                                    </div>
-                                    <span class="text-xs text-neutral-400">Ligue ${m.league_id}</span>
-                                </div>
-                                <div class="text-sm font-bold text-white">${m.home || '?'} vs ${m.away || '?'}</div>
-                                <div class="flex items-center justify-between text-xs mt-1">
-                                    <span class="text-neutral-500">${m.kickoff ? new Date(m.kickoff).toLocaleString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : ''}</span>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-accent font-bold">${cote ? cote.toFixed(2) : '—'}</span>
-                                        <span class="text-yellow-400 font-bold">edge ${edgePct}%</span>
-                                        <span class="text-green-400">${m.mise.toFixed(2)}€</span>
-                                    </div>
-                                </div>
-                            </div>`;
-                        });
-                        html += '</div>';
-                }
-                html += '</div>';
                 
                 // === AUTRES PARIS (edge 3-7%) ===
                 const autres = data.autres_paris || [];
