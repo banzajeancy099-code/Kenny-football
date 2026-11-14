@@ -32,52 +32,11 @@ from layers.kl49_signal_strength import KL49SignalStrength
 # Source unique de vérité : plus de dépendance à leagues.json
 # ─────────────────────────────────────────
 LEAGUES_OVER = {
-    # Tier 1 (N >= 50, Strong >= 25)
-    4, 7, 8, 14, 17, 18, 19, 25, 38, 54, 80, 83,
-    # Tier 2 (N 20-50, Over >= 60%)
-    5, 10, 11, 13, 36, 43, 52, 56, 70, 96,
-    # Championnats nationaux
-    1, 2, 3, 6, 12, 15, 22, 24, 26, 28, 49, 50, 55,
-    57, 82, 86, 87, 89, 91, 95, 97, 98, 99, 100, 101,
-    102, 103, 104, 105, 106, 107, 108, 109,
-    # AJOUTS (toutes sauf amicaux 31 et 79)
-    9,    # Brasileirão Serie A
-    20,   # Liga MX Clausura
-    23,   # Superliga (Roumanie)
-    27,   # World Cup 2026
-    29,   # CAF Champions League
-    30,   # Africa Cup of Nations 2023
-    32,   # Copa Libertadores
-    33,   # Copa Sudamericana
-    39,   # FA Cup
-    40,   # Carabao Cup
-    41,   # Copa del Rey
-    42,   # Coppa Italia
-    44,   # Coupe de France
-    46,   # Puchar Polski
-    47,   # Tunisian Ligue Professionnelle 1
-    48,   # Coupe de Tunisie
-    51,   # Emperor Cup
-    59,   # World Cup Qualification CONMEBOL
-    60,   # World Cup Qualification CAF
-    61,   # World Cup Qualification AFC
-    62,   # World Cup Qualification CONCACAF
-    63,   # World Cup Qualification OFC
-    65,   # CONCACAF Nations League
-    66,   # UEFA Euro 2024
-    67,   # Copa America 2024
-    68,   # AFC Asian Cup 2023
-    69,   # CONCACAF Gold Cup 2025
-    71,   # UEFA European U19 Championship
-    81,   # Copa Colombia
-    88,   # Liga Portugal 2
-    90,   # UEFA Super Cup
-    93,   # Taça da Liga
-    110,  # Ziraat Turkiye Kupasi
+    1, 2, 3, 5, 6, 7, 9, 11, 12, 13, 14, 15, 17, 18, 19, 20, 22, 24, 25, 26, 27, 28, 29, 30, 32, 33, 36, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 55, 56, 57, 59, 60, 61, 62, 63, 65, 66, 67, 68, 69, 70, 71, 80, 81, 82, 83, 86, 87, 88, 90, 91, 93, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 109, 110
 }
 
 LEAGUES_UNDER = {
-    34, 35, 53, 84, 85, 94, 92, 58, 64, 72,
+    4, 34, 35, 53, 54, 58, 64, 72, 84, 85, 92, 94
 }
 
 # Ligues actives = Over + Under (utilisée par run_match)
