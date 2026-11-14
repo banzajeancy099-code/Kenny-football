@@ -2413,7 +2413,9 @@ async function loadHome() {
                                     ${badge}
                                     ${marketBadge}
                                 </div>
-                                <span class="text-xs text-neutral-400">Ligue ${m.league_id}</span>
+                                <span class="badge-market ${m.market === 'under' ? 'under' : 'over'}">
+                                    ${m.market === 'under' ? 'UNDER 2.5' : 'OVER 2.5'}
+                                </span>
                             </div>
                             <div class="text-sm font-medium text-white mb-2">${m.home || '?'} vs ${m.away || '?'}</div>
                             <div class="grid grid-cols-4 gap-1 text-center">
