@@ -44,9 +44,19 @@ class KL31Negatives(Layer):
             home = away = None
 
         if not home or not away:
+            # Rejet strict si données manquantes (pas de fallback)
             res.rejected = True
             res.confidence = 0.0
-            res.warnings = ["L31: splits indisponibles"]
+            res.warnings = ["L31: splits indisponibles → rejet"]
+            return res
+
+        # Seuil minimum : 5 matchs par équipe
+        played_h = home.get("played", 0)
+        played_a = away.get("played", 0)
+        if min(played_h, played_a) < 5:
+            res.score = 3.0
+            res.confidence = 0.5
+            res.warnings = [f"L31: données insuffisantes ({min(played_h, played_a)} matchs, <5) → score neutre"]
             return res
 
         # Signal 1 : 2 attaques faibles

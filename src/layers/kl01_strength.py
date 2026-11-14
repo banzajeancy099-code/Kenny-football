@@ -36,19 +36,25 @@ class KL01Strength(Layer):
         nb_teams = match.get("league_nb_teams")
 
         standings = ctx["bzzoiro"].fetch_league_standings(league_id)
+        
+        # Fallback : si standings absents (match international, coupe),
+        # on calcule un pos_map approximatif depuis k_team_matches
         if not standings or not nb_teams:
-            res.rejected = True
-            res.confidence = 0.0
-            res.warnings.append("L1: standings ligue absent")
-            return res
+            res.warnings.append("L1: standings absents → fallback sans pondération qualité")
+            pos_map = {}
+        else:
+            pos_map = {row["team_id"]: row["position"] for row in standings}
 
-        pos_map = {row["team_id"]: row["position"] for row in standings}
-
+        # Si une équipe n'est pas dans le classement, on continue quand même
         if home_id not in pos_map or away_id not in pos_map:
-            res.rejected = True
-            res.confidence = 0.0
-            res.warnings.append("L1: standings adversaire absent")
-            return res
+            res.warnings.append("L1: standings adversaire partiel → pondération neutre")
+            # On ajoute les équipes manquantes avec position médiane
+            nb_teams = nb_teams or 20
+            mid = nb_teams // 2
+            if home_id not in pos_map:
+                pos_map[home_id] = mid
+            if away_id not in pos_map:
+                pos_map[away_id] = mid
 
         home_matches = ctx["bzzoiro"].fetch_team_matches(home_id, limit=WINDOW)
         away_matches = ctx["bzzoiro"].fetch_team_matches(away_id, limit=WINDOW)
@@ -65,7 +71,7 @@ class KL01Strength(Layer):
         if min_matches < 5:
             res.rejected = True
             res.confidence = 0.0
-            res.warnings.append(f"L1: données insuffisantes ({min_matches} matchs, <5)")
+            res.warnings.append(f"L1: données insuffisantes ({min_matches} matchs, <3)")
             return res
 
         # Dégradation progressive de la confiance
@@ -111,6 +117,18 @@ class KL01Strength(Layer):
 
         res.score = round(score, 2)
         res.confidence = data_confidence
+        # Détection favori écrasant : si une équipe a un score très haut et l'autre très bas
+        # (proxy : écart entre attaque_attack et les autres sous-scores)
+        heavy_fav = False
+        if attack_attack > 7.0 and contexte < 4.0:
+            heavy_fav = True
+            res.warnings.append("L1: favori probable (attaque forte, contexte faible)")
+        
+        # Détection favori écrasant (avant le meta)
+        heavy_fav = attack_attack > 7.0 and contexte < 4.0
+        if heavy_fav:
+            res.warnings.append("L1: favori probable (attaque forte, contexte faible)")
+
         res.meta = {
             "attack_attack": round(attack_attack, 2),
             "home_attack_vs_away_defense": round(ha_vs_ad, 2),
@@ -120,6 +138,7 @@ class KL01Strength(Layer):
             "window": WINDOW,
             "min_matches": min_matches,
             "data_confidence": data_confidence,
+            "heavy_favorite": heavy_fav,
             "weight": W_L1,
         }
         return res

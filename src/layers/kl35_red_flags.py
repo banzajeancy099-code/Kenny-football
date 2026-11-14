@@ -85,21 +85,6 @@ class KL35RedFlags(Layer):
             penalties += 1.5
             warnings.append(f"L35: {zero_zero} matchs 0-0 récents")
             meta["zero_zero"] = True
-
-        # Détection fraude via historique de côtes
-        try:
-            from scripts.detect_fraud_odds import detect_fraud
-            match_id = match.get("match_id")
-            if match_id:
-                is_fraud, fraud_reasons = detect_fraud(match_id)
-                if is_fraud:
-                    res.rejected = True
-                    res.warnings = fraud_reasons
-                    res.meta = {"fraud_detected": True, "reasons": fraud_reasons}
-                    return res
-        except Exception as e:
-            print(f"[L35] detect_fraud KO : {e}")
-        
         score = max(0.0, 10.0 - penalties)
 
         if score < 3.0:

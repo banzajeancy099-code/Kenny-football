@@ -18,9 +18,10 @@ CAPS = {
     "strong": 15.0,
     "medium": 10.0,
     "weak": 0.0,  # Exclu (52.4% réussite, break-even)
-    "weak_nocote": 0.0,  # Ancien moteur ne pariant PAS sur weak_nocote
+    "weak_nocote": 0.0,
     "medium_nocote": 2.0,
-    "low_edge": 0.0,   # NOUVEAU : marché valide mais edge insuffisant
+    "strong_nocote": 15.0,  # NOUVEAU : pas de cote mais signaux forts
+    "low_edge": 0.0,
     "rejected": 0.0,
 }
 
@@ -38,7 +39,7 @@ def kelly_mise(
     """
     cap = CAPS.get(signal, 5.0)
 
-    if signal in ("weak_nocote", "medium_nocote"):
+    if signal in ("weak_nocote", "medium_nocote", "strong_nocote"):
         return min(CAPS[signal], cap)
 
     if signal == "rejected":

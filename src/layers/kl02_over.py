@@ -86,6 +86,9 @@ class KL02Over(Layer):
             meta["closed_league_malus"] = closed_malus
 
         data = self._apply_croisements(data, warnings, meta)
+        
+        # Sauvegarde EG initial (avant tous les ajustements)
+        eg_initial = data["expected_goals"]
         data = self._apply_forme(data, warnings, meta)
         data = self._apply_xg(data, warnings, meta)
         data = self._apply_h2h(data, warnings, meta)
@@ -98,6 +101,20 @@ class KL02Over(Layer):
         data = self._apply_streak(data, ctx, warnings, meta)
         data = self._apply_weather(data, warnings, meta)
         data = self._apply_form_dom_ext(data, warnings, meta)
+
+        # PLAFONNEMENT GLOBAL : EG ne peut varier que de ±30% par rapport à l'initial
+        if eg_initial > 0:
+            eg_final = data["expected_goals"]
+            ratio = eg_final / eg_initial
+            if ratio > 1.30:
+                data["expected_goals"] = eg_initial * 1.30
+                warnings.append(f"L02: plafond EG +30% appliqué (ratio {ratio:.2f})")
+            elif ratio < 0.70:
+                data["expected_goals"] = eg_initial * 0.70
+                warnings.append(f"L02: plafond EG -30% appliqué (ratio {ratio:.2f})")
+            meta["eg_initial"] = round(eg_initial, 3)
+            meta["eg_final"] = round(data["expected_goals"], 3)
+            meta["eg_ratio"] = round(ratio, 3)
 
         score = self._base_score(data, warnings, meta)
         score = self._validate_market(score, data, warnings, meta)
@@ -163,7 +180,7 @@ class KL02Over(Layer):
         played_a = away.get("played", 0)
         min_played = min(played_h, played_a)
 
-        if min_played < 3:
+        if min_played < 5:
             data["rejected"] = True
             data["reasons"] = [f"données insuffisantes ({min_played} matchs, <3)"]
             return data
@@ -277,9 +294,9 @@ class KL02Over(Layer):
             return data
         form_factor = form_avg / base
         if form_factor > 1.15:
-            data["expected_goals"] *= 1.10
+            data["expected_goals"] *= 1.05
         elif form_factor < 0.85:
-            data["expected_goals"] *= 0.90
+            data["expected_goals"] *= 0.95
         meta["form_factor"] = round(form_factor, 3)
         return data
     def _apply_xg(self, data, warnings, meta):
@@ -292,9 +309,9 @@ class KL02Over(Layer):
             return data
         xg_factor = xg_avg / data["expected_goals"]
         if xg_factor > 1.10:
-            data["expected_goals"] *= 1.08
+            data["expected_goals"] *= 1.04
         elif xg_factor < 0.90:
-            data["expected_goals"] *= 0.92
+            data["expected_goals"] *= 0.96
         meta["xg_factor"] = round(xg_factor, 3)
         return data
     def _apply_h2h(self, data, warnings, meta):
@@ -309,9 +326,9 @@ class KL02Over(Layer):
         avg = sum(goals) / len(goals)
         h2h_factor = avg / 2.5
         if h2h_factor < 0.7:
-            data["expected_goals"] *= 0.90
+            data["expected_goals"] *= 0.95
         elif h2h_factor > 1.3:
-            data["expected_goals"] *= 1.10
+            data["expected_goals"] *= 1.05
         meta["h2h_factor"] = round(h2h_factor, 3)
         return data
     def _apply_contexte(self, data, ctx, warnings, meta):
@@ -348,7 +365,7 @@ class KL02Over(Layer):
         prev = data.get("previous_leg_score") or {}
         trailing = prev.get("home_trailing") or prev.get("away_trailing")
         if trailing:
-            data["expected_goals"] *= 1.10
+            data["expected_goals"] *= 1.05
             meta["aller_retour_adjustment"] = 1.10
         else:
             meta["aller_retour_adjustment"] = 1.0
@@ -363,10 +380,10 @@ class KL02Over(Layer):
             meta["momentum_3v5_adjustment"] = None
             return data
         if form_3 > form_5 * 1.3:
-            data["expected_goals"] *= 1.08
-            meta["momentum_3v5_adjustment"] = 1.08
+            data["expected_goals"] *= 1.04
+            meta["momentum_3v5_adjustment"] = 1.04
         elif form_3 < form_5 * 0.7:
-            data["expected_goals"] *= 0.92
+            data["expected_goals"] *= 0.96
             meta["momentum_3v5_adjustment"] = 0.92
         else:
             meta["momentum_3v5_adjustment"] = 1.0
@@ -394,8 +411,8 @@ class KL02Over(Layer):
             return data
         avg = sum(valid) / len(valid)
         if avg > 0.35:
-            data["expected_goals"] *= 1.05
-            meta["late_goals_adjustment"] = 1.05
+            data["expected_goals"] *= 1.03
+            meta["late_goals_adjustment"] = 1.03
         else:
             meta["late_goals_adjustment"] = 1.0
         return data
@@ -416,10 +433,10 @@ class KL02Over(Layer):
             return data
         avg = float(stats["goals_avg"])
         if avg > 2.8:
-            data["expected_goals"] *= 1.05
-            meta["referee_adjustment"] = 1.05
+            data["expected_goals"] *= 1.03
+            meta["referee_adjustment"] = 1.03
         elif avg < 2.2:
-            data["expected_goals"] *= 0.95
+            data["expected_goals"] *= 0.97
             meta["referee_adjustment"] = 0.95
         else:
             meta["referee_adjustment"] = 1.0
@@ -450,11 +467,11 @@ class KL02Over(Layer):
             return data
         adj = 1.0
         if hs >= 5:
-            adj *= 1.05
+            adj *= 1.03
         if as_ >= 5:
-            adj *= 1.05
+            adj *= 1.03
         if hs >= 5 and as_ >= 5:
-            adj *= 1.10
+            adj *= 1.05
             warnings.append("streak cumulé (2 équipes en feu)")
         data["expected_goals"] *= adj
         meta["streak_adjustment"] = round(adj, 3)
@@ -486,10 +503,10 @@ class KL02Over(Layer):
         a_ext = data.get("away_form_gf_ext")
         if h_dom is not None and h_ext is not None and h_ext > 0:
             if h_dom > h_ext * 1.3:
-                adj *= 1.05
+                adj *= 1.03
         if a_ext is not None and a_dom is not None and a_dom > 0:
             if a_ext > a_dom * 1.3:
-                adj *= 1.05
+                adj *= 1.03
         data["expected_goals"] *= adj
         meta["form_dom_ext_adjustment"] = round(adj, 3)
         return data

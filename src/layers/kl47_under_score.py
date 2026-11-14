@@ -86,9 +86,10 @@ class KL47UnderScore(Layer):
         # Rejet sur cote hors plage
         cote_under = data.get("cote_under")
         if cote_under is None:
+            # Rejet strict si cote absente (pas de fallback)
             res.rejected = True
             res.confidence = 0.0
-            res.warnings = warnings + ["L47: cote under absente"]
+            res.warnings = warnings + ["L47: cote under absente → rejet"]
             return res
         # AUDIT v2 : élargi à [1.40, 2.30] (aligné sur kengine [1.40, 2.20])
         if cote_under < 1.40 or cote_under > 3.50:
@@ -261,7 +262,8 @@ class KL47UnderScore(Layer):
     def _layer5_pitchapi(self, data, ctx, warnings, meta):
         pitch = ctx.get("pitchapi")
         if pitch is None:
-            return None
+            warnings.append("L47: PitchAPI absent → fallback")
+            return 0.0  # ← fallback au lieu de None
         try:
             stats = pitch.fetch_match_stats({
                 "match_id": data.get("fixture_id"),
@@ -328,7 +330,8 @@ class KL47UnderScore(Layer):
     def _layer6_blessures(self, data, ctx, warnings, meta):
         api_fb = ctx.get("api_football")
         if api_fb is None:
-            return None
+            warnings.append("L47: API-Football absent → fallback")
+            return 0.0
 
         fixture_id = data.get("fixture_id")
         if fixture_id is None:
@@ -380,7 +383,8 @@ class KL47UnderScore(Layer):
     def _layer7_clv(self, data, ctx, warnings, meta):
         pinnacle = ctx.get("pinnacle")
         if pinnacle is None:
-            return None
+            warnings.append("L47: Pinnacle absent → fallback")
+            return 0.0
 
         try:
             pin_odds = pinnacle.fetch_pinnacle_ou({
