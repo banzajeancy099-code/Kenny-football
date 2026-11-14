@@ -2403,18 +2403,36 @@ async function loadHome() {
                         const badge = signalBadge(m.signal);
                         const marketBadge = getMarketBadge(m.market);
                         const cote = m.market === 'under' ? m.cote_under : m.cote_over;
-                        
+                        const edgePct = m.edge ? (m.edge * 100).toFixed(1) : '—';
+                        const probaPct = m.proba_over ? (m.proba_over * 100).toFixed(1) : 
+                                         m.proba_under ? (m.proba_under * 100).toFixed(1) : '—';
+
                         html += `<div class="card p-3 mb-2 cursor-pointer hover:bg-cardHover transition" onclick="openMatch('${m.match_id}')">
-                            <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center justify-between mb-2">
                                 <div class="flex items-center gap-2">
                                     ${badge}
                                     ${marketBadge}
                                 </div>
+                                <span class="text-xs text-neutral-400">Ligue ${m.league_id}</span>
                             </div>
-                            <div class="text-sm font-medium text-neutral-300 mb-1">${m.home || '?'} vs ${m.away || '?'}</div>
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="text-neutral-500">Ligue ${m.league_id}</span>
-                                <span class="text-neutral-400">${cote ? cote.toFixed(2) : '—'}</span>
+                            <div class="text-sm font-medium text-white mb-2">${m.home || '?'} vs ${m.away || '?'}</div>
+                            <div class="grid grid-cols-4 gap-1 text-center">
+                                <div>
+                                    <div class="text-[9px] text-neutral-500 uppercase">Proba</div>
+                                    <div class="text-xs font-bold text-white">${probaPct}%</div>
+                                </div>
+                                <div>
+                                    <div class="text-[9px] text-neutral-500 uppercase">Edge</div>
+                                    <div class="text-xs font-bold text-yellow-400">${edgePct}%</div>
+                                </div>
+                                <div>
+                                    <div class="text-[9px] text-neutral-500 uppercase">Cote</div>
+                                    <div class="text-xs font-bold text-white">${cote ? cote.toFixed(2) : '—'}</div>
+                                </div>
+                                <div>
+                                    <div class="text-[9px] text-neutral-500 uppercase">Mise</div>
+                                    <div class="text-xs font-bold text-green-400">${(m.mise || 0).toFixed(2)}€</div>
+                                </div>
                             </div>
                         </div>`;
                     });
