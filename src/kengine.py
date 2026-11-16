@@ -31,13 +31,9 @@ from layers.kl49_signal_strength import KL49SignalStrength
 # Ligues typées (AUDIT v3 : 28 ligues optimisées)
 # Source unique de vérité : plus de dépendance à leagues.json
 # ─────────────────────────────────────────
-LEAGUES_OVER = {
-    1, 2, 4, 7, 8, 9, 12, 14, 18, 19, 24, 25, 34, 38, 53, 54, 80, 83, 84, 85, 86, 89, 96, 100
-}
+LEAGUES_OVER = { 1, 2, 4, 9, 12, 14, 18, 24, 25, 34, 38, 84, 86, 89, 100 }
 
-LEAGUES_UNDER = {
-    4, 7, 18, 54, 64
-}
+LEAGUES_UNDER = { 4, 18, 19, 57 }
 
 # Ligues actives = Over + Under (utilisée par run_match)
 ACTIVE_LEAGUES = LEAGUES_OVER | LEAGUES_UNDER

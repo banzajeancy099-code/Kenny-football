@@ -19,3 +19,9 @@ cache/
 Thumbs.db
 *.bak
 *.backup
+
+# Fichiers temporaires
+*.disabled
+models/
+scripts/train_sklearn.py
+scripts/train_xgboost.py

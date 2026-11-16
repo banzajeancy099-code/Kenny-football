@@ -101,6 +101,8 @@ class KL02Over(Layer):
         data = self._apply_streak(data, ctx, warnings, meta)
         data = self._apply_weather(data, warnings, meta)
         data = self._apply_form_dom_ext(data, warnings, meta)
+        data = self._apply_offensive_bonus(data, ctx, warnings, meta)
+        data = self._apply_offensive_bonus(data, ctx, warnings, meta)
 
         # PLAFONNEMENT GLOBAL : EG ne peut varier que de ±30% par rapport à l'initial
         if eg_initial > 0:
@@ -510,6 +512,70 @@ class KL02Over(Layer):
         data["expected_goals"] *= adj
         meta["form_dom_ext_adjustment"] = round(adj, 3)
         return data
+    def _apply_offensive_bonus(self, data, ctx, warnings, meta):
+        """Bonus +1.5 si les 2 équipes sont offensives (Over% >= 70%)."""
+        db = ctx.get("db")
+        if db is None:
+            return data
+        
+        home_id = data.get("home_team_id")
+        away_id = data.get("away_team_id")
+        if not home_id or not away_id:
+            return data
+        
+        try:
+            with db.get_conn() as conn:
+                rows = conn.run("""
+                    SELECT team_id FROM k_offensive_teams
+                    WHERE team_id IN (%s, %s)
+                """, home_id, away_id)
+                offensive_teams = [r[0] for r in rows]
+        except Exception:
+            return data
+        
+        if len(offensive_teams) == 2:
+            data["expected_goals"] *= 1.05
+            meta["offensive_bonus"] = 1.05
+            warnings.append("L02: 2 équipes offensives → bonus +5%")
+        elif len(offensive_teams) == 1:
+            meta["offensive_bonus"] = 1.0
+        else:
+            meta["offensive_bonus"] = None
+        
+        return data
+
+    def _apply_offensive_bonus(self, data, ctx, warnings, meta):
+        """Bonus +1.5 si les 2 équipes sont offensives (Over% >= 70%)."""
+        db = ctx.get("db")
+        if db is None:
+            return data
+        
+        home_id = data.get("home_team_id")
+        away_id = data.get("away_team_id")
+        if not home_id or not away_id:
+            return data
+        
+        try:
+            with db.get_conn() as conn:
+                rows = conn.run("""
+                    SELECT team_id FROM k_offensive_teams
+                    WHERE team_id IN (%s, %s)
+                """, home_id, away_id)
+                offensive_teams = [r[0] for r in rows]
+        except Exception:
+            return data
+        
+        if len(offensive_teams) == 2:
+            data["expected_goals"] *= 1.05
+            meta["offensive_bonus"] = 1.05
+            warnings.append("L02: 2 équipes offensives → bonus +5%")
+        elif len(offensive_teams) == 1:
+            meta["offensive_bonus"] = 1.0
+        else:
+            meta["offensive_bonus"] = None
+        
+        return data
+
     def _base_score(self, data, warnings, meta):
         eg = data["expected_goals"]
         score_base = 5.0 + (eg - 2.5) * 2.5
