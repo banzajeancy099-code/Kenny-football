@@ -102,6 +102,7 @@ class KL02Over(Layer):
         data = self._apply_weather(data, warnings, meta)
         data = self._apply_form_dom_ext(data, warnings, meta)
         data = self._apply_offensive_bonus(data, ctx, warnings, meta)
+        data = self._apply_key_players(data, ctx, warnings, meta)
         data = self._apply_offensive_bonus(data, ctx, warnings, meta)
 
         # PLAFONNEMENT GLOBAL : EG ne peut varier que de ±30% par rapport à l'initial
@@ -573,6 +574,75 @@ class KL02Over(Layer):
             meta["offensive_bonus"] = 1.0
         else:
             meta["offensive_bonus"] = None
+        
+        return data
+
+    def _apply_key_players(self, data, ctx, warnings, meta):
+        """Ajuste l'EG si un joueur clé est absent."""
+        bzz = ctx.get("bzzoiro")
+        db = ctx.get("db")
+        if not bzz or not db:
+            return data
+        
+        event_id = data.get("fixture_id")
+        if not event_id:
+            return data
+        
+        try:
+            lineups = bzz.get_event_lineups(event_id)
+        except Exception:
+            return data
+        
+        if not lineups or not isinstance(lineups, dict):
+            return data
+        
+        home_players = []
+        away_players = []
+        
+        home_lineup = lineups.get("lineups", {}).get("home", {})
+        away_lineup = lineups.get("lineups", {}).get("away", {})
+        
+        for p in home_lineup.get("players", []):
+            home_players.append(p.get("name", ""))
+        for p in away_lineup.get("players", []):
+            away_players.append(p.get("name", ""))
+        
+        if not home_players and not away_players:
+            return data
+        
+        # Récupère les joueurs clés des 2 équipes
+        try:
+            with db.get_conn() as conn:
+                rows = conn.run("""
+                    SELECT player_name, team_name, impact_over
+                    FROM k_key_players
+                    WHERE team_name IN (
+                        (SELECT home_team_name FROM k_predictions WHERE match_id = %s LIMIT 1),
+                        (SELECT away_team_name FROM k_predictions WHERE match_id = %s LIMIT 1)
+                    )
+                """, data.get("fixture_id"), data.get("fixture_id"))
+                key_players = [dict(zip([c["name"] for c in conn.columns], r)) for r in rows]
+        except Exception:
+            return data
+        
+        missing_home = 0
+        missing_away = 0
+        for kp in key_players:
+            name = kp["player_name"]
+            impact = kp["impact_over"] or 0.10
+            
+            if not any(name.lower() in p.lower() for p in home_players):
+                missing_home += impact
+            if not any(name.lower() in p.lower() for p in away_players):
+                missing_away += impact
+        
+        if missing_home > 0 or missing_away > 0:
+            total_malus = 1 - min(missing_home + missing_away, 0.30)
+            data["expected_goals"] *= total_malus
+            meta["key_players_malus"] = round(total_malus, 3)
+            warnings.append(f"L02: joueur(s) clé(s) absent(s) → malus -{(1-total_malus)*100:.0f}%")
+        else:
+            meta["key_players_malus"] = 1.0
         
         return data
 
