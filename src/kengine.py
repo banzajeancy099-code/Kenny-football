@@ -232,7 +232,14 @@ def run_match(match: dict, ctx: dict, bankroll: float = 1000.0) -> dict:
     if match_id:
         try:
             from scripts.detect_fraud_odds import detect_fraud
-            is_fraud, fraud_reasons = detect_fraud(match_id)
+            is_fraud, fraud_reasons = detect_fraud(
+                match_id=str(match.get("match_id")),
+                home_team=match.get("home_team_name") or "",
+                away_team=match.get("away_team_name") or "",
+                league_id=match.get("league_id"),
+                kickoff=match.get("kickoff") or match.get("event_date") or "",
+                conn=None,
+            )
             if is_fraud:
                 return _rejected_dict(match, f"FRAUDE détectée : {fraud_reasons}", None)
         except Exception as e:
